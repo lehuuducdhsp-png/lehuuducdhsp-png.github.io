@@ -158,7 +158,7 @@
         <section class="view" id="settings">
           <div class="page-head"><div><h2>Cài đặt</h2><p>Thông tin nhận diện và sao lưu dữ liệu.</p></div></div>
           <div class="settings-profile"><div class="card photo-panel"><img src="assets/thay-duc.jpg" alt="Ảnh giáo viên"><h3>LÊ HỮU ĐỨC</h3><div class="sub">Giáo viên KHTN & Hóa học</div></div><div class="card"><div class="form-grid"><div class="field"><label>Họ và tên</label><input value="LÊ HỮU ĐỨC" readonly></div><div class="field"><label>Fanpage</label><input value="Page Thầy Đức – Lớp KHTN & Hóa" readonly></div><div class="field full"><label>Khẩu hiệu</label><input value="Học chắc – Hiểu bản chất – Tiến bộ rõ ràng" readonly></div><div class="field full"><label>Quyền riêng tư</label><input value="Thông tin liên hệ và dữ liệu học sinh không được ghi vào mã nguồn công khai" readonly></div></div></div></div>
-          <div class="grid-equal" style="margin-top:18px"><div class="card"><div class="card-head"><div><h3>Kết nối dữ liệu</h3><div class="sub">Trạng thái hệ thống</div></div></div><div class="connection"><div><b>Supabase Auth</b><div class="sub">Đã bảo vệ trang bằng tài khoản giáo viên</div></div><span class="badge green"><i class="dot"></i>Đã kết nối</span></div><div class="notice" style="margin-top:12px">Xác thực đã dùng Supabase; dữ liệu lớp học hiện vẫn lưu trong trình duyệt này. Hãy xuất bản sao lưu trước khi xóa dữ liệu trình duyệt hoặc đổi máy.</div></div><div class="card"><div class="card-head"><div><h3>Sao lưu cục bộ</h3><div class="sub">Tải xuống hoặc khôi phục tệp JSON.</div></div></div><div class="actions"><button class="btn primary" onclick="exportData()">⇩ Xuất dữ liệu</button><label class="btn outline" for="importFile">⇧ Nhập dữ liệu</label><input id="importFile" type="file" accept="application/json" hidden onchange="importData(event)"><button class="btn danger" onclick="resetData()">↺ Khôi phục mẫu</button></div></div></div>
+          <div class="grid-equal" style="margin-top:18px"><div class="card"><div class="card-head"><div><h3>Kết nối dữ liệu</h3><div class="sub">Đăng nhập và đồng bộ nhiều thiết bị</div></div></div><div class="connection"><div><b>Supabase Auth</b><div class="sub">Đã bảo vệ trang bằng tài khoản giáo viên</div></div><span class="badge green"><i class="dot"></i>Đã kết nối</span></div><div class="connection" style="margin-top:12px"><div><b>Dữ liệu lớp học</b><div class="sub" id="cloudStatusText">Đang kiểm tra đồng bộ…</div></div><span class="badge gray" id="cloudStatusBadge"><i class="dot"></i>Đang kiểm tra</span></div><div class="actions" style="margin-top:14px"><button class="btn primary" id="cloudInitButton" onclick="initializeCloudFromDevice()">☁ Dùng dữ liệu máy này làm bản gốc</button><button class="btn outline" id="cloudPullButton" onclick="loadCloudState({manual:true})">↻ Tải dữ liệu mới nhất</button></div><div class="notice" id="cloudNotice" style="margin-top:12px">Khi đồng bộ được bật, mọi thay đổi sẽ tự lưu lên Supabase và điện thoại sẽ tải cùng một dữ liệu sau khi đăng nhập.</div></div><div class="card"><div class="card-head"><div><h3>Sao lưu cục bộ</h3><div class="sub">Tải xuống hoặc khôi phục tệp JSON.</div></div></div><div class="actions"><button class="btn primary" onclick="exportData()">⇩ Xuất dữ liệu</button><label class="btn outline" for="importFile">⇧ Nhập dữ liệu</label><input id="importFile" type="file" accept="application/json" hidden onchange="importData(event)"><button class="btn danger" onclick="resetData()">↺ Khôi phục mẫu</button></div></div></div>
         </section>
       </div>
     </main>
@@ -175,79 +175,21 @@
     const SUPABASE_PUBLISHABLE_KEY='sb_publishable_u05uKoArlUZn_OMtS5aVgA__W3np9Hb';
     const AUTH_USERNAME='lehuuducdhsp';
     const AUTH_EMAIL='lehuuducdhsp@gmail.com';
-    let supabaseClient=null;
+    let supabaseClient=null,currentSession=null,cloudRowReady=localStorage.getItem('ducCloudReady')==='1',cloudSaveTimer=null,cloudDirty=false,cloudSaving=false,cloudLastUpdated='',cloudLoadedUser='';
     const isAuthorized=session=>session?.user?.email?.toLowerCase()===AUTH_EMAIL;
     function setAuthError(message=''){const el=document.getElementById('authError');el.textContent=message;el.classList.toggle('show',Boolean(message))}
     function showLogin(message=''){document.getElementById('classroomApp').style.display='none';document.getElementById('authScreen').style.display='grid';document.getElementById('authChecking').hidden=true;document.getElementById('loginForm').hidden=false;setAuthError(message)}
-    function showApp(){document.getElementById('authScreen').style.display='none';document.getElementById('classroomApp').style.display='block';renderAll()}
-    async function initAuth(){if(!window.supabase?.createClient){showLogin('Không tải được hệ thống xác thực. Vui lòng kiểm tra mạng và tải lại trang.');return}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});try{const{data,error}=await supabaseClient.auth.getSession();if(error)throw error;if(isAuthorized(data.session)){showApp()}else{if(data.session)await supabaseClient.auth.signOut();showLogin()}supabaseClient.auth.onAuthStateChange((_event,session)=>{if(isAuthorized(session))showApp();else showLogin()})}catch{showLogin('Chưa thể kết nối Supabase. Vui lòng tải lại trang sau ít phút.')}}
-    async function login(event){event.preventDefault();if(!supabaseClient){setAuthError('Hệ thống xác thực chưa sẵn sàng. Vui lòng tải lại trang.');return}const form=event.currentTarget,username=form.username.value.trim().toLowerCase(),password=form.password.value,button=document.getElementById('loginButton');setAuthError('');if(username!==AUTH_USERNAME){setAuthError('Tên đăng nhập hoặc mật khẩu không đúng.');return}button.disabled=true;button.textContent='Đang đăng nhập…';try{const{data,error}=await supabaseClient.auth.signInWithPassword({email:AUTH_EMAIL,password});if(error)throw error;if(!isAuthorized(data.session)){await supabaseClient.auth.signOut();throw new Error('unauthorized')}form.password.value='';showApp()}catch(error){const message=String(error?.message||'').toLowerCase();setAuthError(message.includes('confirm')?'Tài khoản chưa được xác nhận trong Supabase. Hãy bật Auto Confirm User.':'Tên đăng nhập hoặc mật khẩu không đúng.')}finally{button.disabled=false;button.textContent='Đăng nhập'}}
-    async function logout(){try{await supabaseClient?.auth.signOut()}finally{showLogin();toast('Đã đăng xuất an toàn.')}}
+    function showApp(){document.getElementById('authScreen').style.display='none';document.getElementById('classroomApp').style.display='block';renderAll();const userId=currentSession?.user?.id;if(userId&&cloudLoadedUser!==userId){cloudLoadedUser=userId;loadCloudState({initial:true})}}
+    async function initAuth(){if(!window.supabase?.createClient){showLogin('Không tải được hệ thống xác thực. Vui lòng kiểm tra mạng và tải lại trang.');return}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});try{const{data,error}=await supabaseClient.auth.getSession();if(error)throw error;currentSession=data.session;if(isAuthorized(currentSession)){showApp()}else{if(currentSession)await supabaseClient.auth.signOut();currentSession=null;showLogin()}supabaseClient.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(isAuthorized(session))showApp();else{cloudRowReady=false;cloudLoadedUser='';showLogin()}})}catch{showLogin('Chưa thể kết nối Supabase. Vui lòng tải lại trang sau ít phút.')}}
+    async function login(event){event.preventDefault();if(!supabaseClient){setAuthError('Hệ thống xác thực chưa sẵn sàng. Vui lòng tải lại trang.');return}const form=event.currentTarget,username=form.username.value.trim().toLowerCase(),password=form.password.value,button=document.getElementById('loginButton');setAuthError('');if(username!==AUTH_USERNAME){setAuthError('Tên đăng nhập hoặc mật khẩu không đúng.');return}button.disabled=true;button.textContent='Đang đăng nhập…';try{const{data,error}=await supabaseClient.auth.signInWithPassword({email:AUTH_EMAIL,password});if(error)throw error;if(!isAuthorized(data.session)){await supabaseClient.auth.signOut();throw new Error('unauthorized')}currentSession=data.session;form.password.value='';showApp()}catch(error){const message=String(error?.message||'').toLowerCase();setAuthError(message.includes('confirm')?'Tài khoản chưa được xác nhận trong Supabase. Hãy bật Auto Confirm User.':'Tên đăng nhập hoặc mật khẩu không đúng.')}finally{button.disabled=false;button.textContent='Đăng nhập'}}
+    async function logout(){try{await supabaseClient?.auth.signOut()}finally{currentSession=null;cloudRowReady=false;cloudLoadedUser='';showLogin();toast('Đã đăng xuất an toàn.')}}
     const isoLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const dateObj=s=>new Date((s||isoLocal(new Date()))+'T12:00:00');
     const mondayISO=value=>{const d=value instanceof Date?new Date(value):dateObj(value),day=d.getDay()||7;d.setDate(d.getDate()-day+1);return isoLocal(d)};
     const addDaysISO=(value,days)=>{const d=dateObj(value);d.setDate(d.getDate()+days);return isoLocal(d)};
     const dayCode=value=>{const d=dateObj(value).getDay();return d===0?8:d+1};
     const dateForDay=(weekStart,day)=>addDaysISO(weekStart,day===8?6:day-2);
-    const initial={
-      students:[
-        {id:'student-a',name:'Học sinh A',full:'Học sinh A',grade:9,subjects:'KHTN, Toán',fee:150000,status:'active',mode:'1:1'},
-        {id:'student-b',name:'Học sinh B',full:'Học sinh B',grade:6,subjects:'KHTN, Toán',fee:150000,status:'active',mode:'1:1'},
-        {id:'student-c',name:'Học sinh C',full:'Học sinh C',grade:9,subjects:'KHTN',fee:150000,status:'active',mode:'1:1'},
-        {id:'student-d',name:'Học sinh D',full:'Học sinh D',grade:9,subjects:'KHTN',fee:175000,status:'active',mode:'1:1'},
-        {id:'student-e',name:'Học sinh E',full:'Học sinh E',grade:9,subjects:'KHTN',fee:150000,status:'active',mode:'1:1'},
-        {id:'student-f',name:'Học sinh F',full:'Học sinh F',grade:9,subjects:'KHTN',fee:150000,status:'inactive',mode:'1:1'}
-      ],
-      schedules:[
-        {id:'s1',day:2,time:'19:15–20:45',student:'student-a',subject:'Vật lý 9',mode:'Trực tiếp'},
-        {id:'s2',day:3,time:'17:30–19:00',student:'student-b',subject:'Toán 6',mode:'Trực tiếp'},
-        {id:'s3',day:4,time:'19:15–20:45',student:'student-a',subject:'Toán 9',mode:'Trực tiếp'},
-        {id:'s4',day:5,time:'17:30–19:00',student:'student-b',subject:'Hóa học 6',mode:'Trực tiếp'},
-        {id:'s5',day:5,time:'19:15–20:45',student:'student-a',subject:'Hóa học 9',mode:'Trực tiếp'},
-        {id:'s6',day:6,time:'17:30–19:00',student:'student-b',subject:'Toán 6',mode:'Trực tiếp'},
-        {id:'s7',day:6,time:'19:15–20:45',student:'student-a',subject:'Toán 9',mode:'Trực tiếp'},
-        {id:'s8',day:7,time:'09:30–11:00',student:'student-c',subject:'Vật lý 9',mode:'Trực tiếp'},
-        {id:'s9',day:7,time:'17:30–19:00',student:'student-b',subject:'Sinh học 6',mode:'Trực tiếp'},
-        {id:'s10',day:7,time:'19:15–20:45',student:'student-a',subject:'Sinh học 9',mode:'Trực tiếp'},
-        {id:'s11',day:8,time:'17:30–19:00',student:'student-b',subject:'Toán 6',mode:'Trực tiếp'},
-        {id:'s12',day:8,time:'19:15–20:45',student:'student-a',subject:'Toán 9',mode:'Trực tiếp'}
-      ],
-      attendance:[
-        {id:'a1',date:'2026-07-05',student:'student-a',subject:'Toán 9',time:'19:15',status:'present',charged:true},
-        {id:'a2',date:'2026-07-06',student:'student-b',subject:'Vật lý 6',time:'19:30',status:'present',charged:true},
-        {id:'a3',date:'2026-07-07',student:'student-a',subject:'Vật lý 9',time:'19:15',status:'present',charged:true},
-        {id:'a4',date:'2026-07-08',student:'student-b',subject:'Toán 6',time:'17:30',status:'present',charged:true},
-        {id:'a5',date:'2026-07-09',student:'student-a',subject:'Toán 9',time:'19:15',status:'present',charged:true},
-        {id:'a6',date:'2026-07-10',student:'student-d',subject:'KHTN 9',time:'15:30',status:'present',charged:true},
-        {id:'a7',date:'2026-07-11',student:'student-e',subject:'KHTN 9',time:'14:00',status:'present',charged:true},
-        {id:'a8',date:'2026-07-12',student:'student-c',subject:'Vật lý 9',time:'09:30',status:'excused',charged:false},
-        {id:'a9',date:'2026-07-13',student:'student-a',subject:'Toán 9',time:'19:15',status:'present',charged:true},
-        {id:'a10',date:'2026-07-14',student:'student-b',subject:'Vật lý 6',time:'19:30',status:'present',charged:true},
-        {id:'a11',date:'2026-07-14',student:'student-d',subject:'KHTN 9',time:'15:30',status:'present',charged:true},
-        {id:'a12',date:'2026-07-15',student:'student-e',subject:'KHTN 9',time:'14:00',status:'present',charged:true}
-      ],
-      scores:[
-        {id:'p1',student:'student-a',type:'Dò bài',subject:'Toán 9',date:'2026-07-07',score:7.5,weight:1},
-        {id:'p2',student:'student-a',type:'Kiểm tra chủ đề',subject:'KHTN 9',date:'2026-07-10',score:8,weight:2},
-        {id:'p3',student:'student-b',type:'BTVN',subject:'Toán 6',date:'2026-07-08',score:9,weight:1},
-        {id:'p4',student:'student-b',type:'Kiểm tra nhanh',subject:'KHTN 6',date:'2026-07-12',score:8.5,weight:1},
-        {id:'p5',student:'student-c',type:'Định kỳ / Thi thử',subject:'Vật lý 9',date:'2026-07-13',score:7,weight:3},
-        {id:'p6',student:'student-d',type:'Dò bài',subject:'KHTN 9',date:'2026-07-14',score:8,weight:1}
-      ],
-      assignments:[
-        {id:'b1',student:'student-a',subject:'Toán 9',title:'Hệ phương trình',due:'2026-07-17',status:'doing',note:'Hoàn thành bài 1–8 trong tài liệu.'},
-        {id:'b2',student:'student-b',subject:'KHTN 6',title:'Ôn tập tế bào',due:'2026-07-18',status:'new',note:'Học phần ghi nhớ và làm phiếu bài tập.'},
-        {id:'b3',student:'student-c',subject:'Vật lý 9',title:'Công và công suất',due:'2026-07-19',status:'done',note:'Đã nộp và chờ nhận xét.'}
-      ],
-      payments:{'student-a':0,'student-b':0,'student-c':0,'student-d':0,'student-e':0},
-      paymentTransactions:[],
-      documents:[
-        {title:'Đề ôn tập KHTN 9',type:'PDF',size:'1,8 MB'},
-        {title:'Phiếu bài tập Toán 6',type:'DOCX',size:'640 KB'},
-        {title:'Bảng công thức Hóa học',type:'PDF',size:'2,1 MB'},
-        {title:'Mẫu báo cáo phụ huynh',type:'DOCX',size:'420 KB'}
-      ]
-    };
+    const initial={students:[],schedules:[],attendance:[],scores:[],assignments:[],payments:{},paymentTransactions:[],documents:[]};
     let db=JSON.parse(localStorage.getItem('ducClassroomV1')||'null')||structuredClone(initial);
     let selectedWeekStart=mondayISO(localStorage.getItem('ducSelectedWeek')||isoLocal(new Date()));
     let attendanceStudentFilter='all';
@@ -256,7 +198,14 @@
     function normalizeBillingData(){let changed=false;if(!Array.isArray(db.paymentTransactions)){db.paymentTransactions=[];Object.entries(db.payments||{}).forEach(([studentId,value])=>{const amount=Math.max(0,Number(value)||0),s=db.students.find(x=>x.id===studentId);if(amount&&s){db.paymentTransactions.push({id:uid(),student:studentId,date:isoLocal(new Date()),periodStart:'',periodEnd:'',sessions:s.fee?Math.round(amount/s.fee):0,amount,accountingMode:'history',note:'Chuyển từ tổng đã thu trước đây'});changed=true}});changed=true}db.paymentTransactions.forEach(p=>{if(!['history','current'].includes(p.accountingMode)){p.accountingMode='history';changed=true}if(p.periodStart===undefined){p.periodStart='';changed=true}if(p.periodEnd===undefined){p.periodEnd='';changed=true}});if(!db.payments){db.payments={};changed=true}return changed}
     normalizeSchedules();
     if(normalizeBillingData())localStorage.setItem('ducClassroomV1',JSON.stringify(db));
-    const save=()=>{localStorage.setItem('ducClassroomV1',JSON.stringify(db));renderAll()};
+    const validClassroomData=value=>value&&Array.isArray(value.students)&&Array.isArray(value.schedules)&&Array.isArray(value.attendance)&&Array.isArray(value.scores)&&Array.isArray(value.assignments);
+    const missingCloudTable=error=>['42P01','PGRST205'].includes(error?.code)||/classroom_state|schema cache|does not exist/i.test(String(error?.message||''));
+    function setCloudStatus(mode,message){const badge=document.getElementById('cloudStatusBadge'),text=document.getElementById('cloudStatusText'),init=document.getElementById('cloudInitButton'),pull=document.getElementById('cloudPullButton'),notice=document.getElementById('cloudNotice'),styles={ready:['green','Đã đồng bộ'],saving:['blue','Đang đồng bộ'],setup:['orange','Chưa khởi tạo'],offline:['gray','Đang lưu cục bộ'],error:['red','Chưa kết nối']},style=styles[mode]||styles.offline;if(text)text.textContent=message;if(badge){badge.className=`badge ${style[0]}`;badge.innerHTML=`<i class="dot"></i>${style[1]}`}if(init)init.hidden=cloudRowReady;if(pull){pull.hidden=!cloudRowReady;pull.disabled=mode==='saving'}if(notice){notice.textContent=mode==='ready'?'Mọi thay đổi sẽ tự lưu lên Supabase. Điện thoại và máy tính dùng chung dữ liệu sau khi đăng nhập.':mode==='setup'?'Chưa có bản dữ liệu chung. Chỉ bấm nút dùng dữ liệu máy này làm bản gốc trên thiết bị đang có dữ liệu đầy đủ nhất.':mode==='error'?'Cần tạo bảng classroom_state trong Supabase một lần để bật đồng bộ nhiều thiết bị.':'Nếu mạng gián đoạn, thay đổi vẫn được giữ trong trình duyệt và sẽ thử đồng bộ lại khi có mạng.'}}
+    async function loadCloudState({manual=false,initial=false}={}){if(!supabaseClient||!isAuthorized(currentSession))return false;if((cloudDirty||cloudSaving)&&cloudRowReady){if(manual)toast('Có thay đổi đang được lưu. Vui lòng chờ vài giây rồi tải lại.');return false}const hadCloudRow=cloudRowReady;setCloudStatus('saving',initial?'Đang tải dữ liệu chung từ Supabase…':'Đang kiểm tra dữ liệu mới nhất…');try{const{data,error}=await supabaseClient.from('classroom_state').select('data, updated_at').eq('owner_id',currentSession.user.id).maybeSingle();if(error)throw error;if(!data){cloudRowReady=false;cloudLastUpdated='';localStorage.removeItem('ducCloudReady');setCloudStatus('setup','Supabase chưa có bản dữ liệu chung.');if(manual)toast('Chưa có dữ liệu chung. Hãy khởi tạo từ máy đang có dữ liệu đầy đủ.');return false}if(!validClassroomData(data.data))throw new Error('Dữ liệu trên Supabase không đúng cấu trúc.');db=structuredClone(data.data);normalizeSchedules();normalizeBillingData();localStorage.setItem('ducClassroomV1',JSON.stringify(db));localStorage.setItem('ducCloudReady','1');cloudRowReady=true;cloudDirty=false;cloudLastUpdated=data.updated_at||'';renderAll();setCloudStatus('ready',`Cập nhật gần nhất: ${new Date(cloudLastUpdated).toLocaleString('vi-VN')}`);if(manual)toast('Đã tải dữ liệu mới nhất từ Supabase.');return true}catch(error){cloudRowReady=missingCloudTable(error)?false:hadCloudRow;if(missingCloudTable(error))localStorage.removeItem('ducCloudReady');if(missingCloudTable(error)){setCloudStatus('error','Chưa tạo bảng dữ liệu đồng bộ trong Supabase.')}else{setCloudStatus('offline','Không tải được Supabase; đang dùng dữ liệu trên thiết bị này.')}if(manual)toast(missingCloudTable(error)?'Chưa bật bảng dữ liệu Supabase.':'Chưa thể tải dữ liệu; vui lòng kiểm tra mạng.');return false}}
+    async function writeCloudState({initializing=false}={}){if(!supabaseClient||!isAuthorized(currentSession)||(!cloudRowReady&&!initializing))return false;clearTimeout(cloudSaveTimer);const payload=structuredClone(db),snapshot=JSON.stringify(payload),updatedAt=new Date().toISOString();cloudSaving=true;cloudDirty=false;setCloudStatus('saving','Đang lưu thay đổi lên Supabase…');try{const{error}=await supabaseClient.from('classroom_state').upsert({owner_id:currentSession.user.id,data:payload,updated_at:updatedAt},{onConflict:'owner_id'});if(error)throw error;cloudRowReady=true;localStorage.setItem('ducCloudReady','1');cloudLastUpdated=updatedAt;cloudSaving=false;if(JSON.stringify(db)!==snapshot){cloudDirty=true;queueCloudSave()}else setCloudStatus('ready',`Đã đồng bộ lúc ${new Date(updatedAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}`);return true}catch(error){cloudSaving=false;cloudDirty=true;cloudRowReady=!missingCloudTable(error)&&cloudRowReady;if(missingCloudTable(error))localStorage.removeItem('ducCloudReady');setCloudStatus(missingCloudTable(error)?'error':'offline',missingCloudTable(error)?'Chưa tạo bảng dữ liệu đồng bộ trong Supabase.':'Lưu trên máy thành công; Supabase sẽ được thử lại khi có mạng.');return false}}
+    function queueCloudSave(){if(!cloudRowReady||!isAuthorized(currentSession))return;clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(()=>writeCloudState(),700)}
+    async function initializeCloudFromDevice(){if(!supabaseClient||!isAuthorized(currentSession)){toast('Vui lòng đăng nhập lại.');return}setCloudStatus('saving','Đang kiểm tra Supabase trước khi khởi tạo…');try{const{data,error}=await supabaseClient.from('classroom_state').select('updated_at').eq('owner_id',currentSession.user.id).maybeSingle();if(error)throw error;if(data){cloudRowReady=true;cloudDirty=false;await loadCloudState({manual:true});return}}catch(error){setCloudStatus(missingCloudTable(error)?'error':'offline',missingCloudTable(error)?'Chưa tạo bảng dữ liệu đồng bộ trong Supabase.':'Chưa thể kết nối Supabase.');toast(missingCloudTable(error)?'Anh cần tạo bảng dữ liệu Supabase trước.':'Không kết nối được Supabase.');return}if(!confirm('Chọn dữ liệu trên thiết bị này làm bản gốc chung?\n\nChỉ tiếp tục trên máy đang có đầy đủ học sinh, lịch học, điểm danh và học phí nhất.')){setCloudStatus('setup','Supabase chưa có bản dữ liệu chung.');return}cloudDirty=true;const ok=await writeCloudState({initializing:true});if(ok)toast('Đã đưa dữ liệu máy này lên Supabase. Từ giờ điện thoại và máy tính sẽ dùng chung dữ liệu.')}
+    const save=()=>{localStorage.setItem('ducClassroomV1',JSON.stringify(db));renderAll();cloudDirty=true;queueCloudSave()};
     function updateUndoButton(){const btn=document.getElementById('undoBtn'),last=undoStack[undoStack.length-1];if(!btn)return;btn.disabled=!last;btn.title=last?`Hoàn tác: ${last.label}`:'Chưa có thao tác để hoàn tác'}
     function pushUndo(label){undoStack.push({label,db:structuredClone(db),selectedWeekStart,attendanceStudentFilter});if(undoStack.length>UNDO_LIMIT)undoStack.shift();updateUndoButton()}
     function undoLast(){const last=undoStack.pop();if(!last){toast('Chưa có thao tác nào để hoàn tác.');return}db=structuredClone(last.db);selectedWeekStart=last.selectedWeekStart;attendanceStudentFilter=last.attendanceStudentFilter;normalizeSchedules();normalizeBillingData();localStorage.setItem('ducSelectedWeek',selectedWeekStart);closeModal();save();updateUndoButton();toast(`Đã hoàn tác: ${last.label}.`)}
@@ -418,8 +367,12 @@
     function resetData(){if(confirm('Khôi phục dữ liệu mẫu? Dữ liệu đang nhập sẽ bị thay thế.')){pushUndo('khôi phục dữ liệu mẫu');db=structuredClone(initial);normalizeSchedules();normalizeBillingData();save();toast('Đã khôi phục dữ liệu mẫu. Có thể bấm Hoàn tác để quay lại.')}}
     function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.classList.remove('show'),2300)}
     function renderAll(){setDates();renderDashboard();renderStudents();renderSchedule();renderTimetable();renderAttendance();renderScores();renderAssignments();renderTuition();renderDocs();fillStudentSelects();renderReport()}
+    function refreshCloudWhenActive(){if(document.getElementById('classroomApp').style.display!=='block'||cloudSaving||!isAuthorized(currentSession))return;if(!cloudRowReady){loadCloudState();return}if(cloudDirty)writeCloudState();else loadCloudState()}
     initAuth();
-    window.setInterval(()=>{if(document.getElementById('classroomApp').style.display==='block'){setDates();renderDashboard()}},60000);
+    window.addEventListener('focus',refreshCloudWhenActive);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshCloudWhenActive()});
+    window.addEventListener('online',refreshCloudWhenActive);
+    window.setInterval(()=>{if(document.getElementById('classroomApp').style.display==='block'){setDates();renderDashboard();refreshCloudWhenActive()}},60000);
   </script>
 </body>
 </html>
