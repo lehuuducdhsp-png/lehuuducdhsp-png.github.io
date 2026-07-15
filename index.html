@@ -15,7 +15,7 @@
     }
     *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
     button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}
-    .app{min-height:100vh}.sidebar{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:linear-gradient(165deg,#082f49 0%,#0b4d5f 58%,#0f766e 100%);color:#fff;padding:20px 16px;display:flex;flex-direction:column;z-index:30;overflow:auto;box-shadow:8px 0 30px rgba(8,47,73,.12)}
+    .app{min-height:100vh;display:none}.auth-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 15% 20%,rgba(34,197,94,.13),transparent 28%),radial-gradient(circle at 85% 15%,rgba(37,99,235,.13),transparent 30%),linear-gradient(145deg,#eef8f6,#f3f7fb 55%,#e8f5f1)}.auth-card{width:min(440px,100%);background:rgba(255,255,255,.96);border:1px solid rgba(226,232,240,.9);border-radius:26px;padding:30px;box-shadow:0 28px 75px rgba(8,47,73,.16)}.auth-brand{display:flex;align-items:center;gap:13px;padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--line)}.auth-brand img{width:64px;height:64px;border-radius:50%;border:3px solid #d9f3ea}.auth-brand strong{display:block;color:var(--navy2);font-size:17px;letter-spacing:.03em}.auth-brand span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.auth-card h1{margin:0 0 5px;font-size:24px;color:var(--navy)}.auth-card>p{margin:0 0 20px;color:var(--muted);font-size:13px}.auth-form{display:grid;gap:14px}.auth-form .btn{width:100%;padding:12px}.auth-error{display:none;padding:10px 12px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:12px}.auth-error.show{display:block}.auth-checking{text-align:center;padding:24px 0;color:var(--muted)}.auth-spinner{width:30px;height:30px;border:3px solid #d9eee9;border-top-color:var(--teal);border-radius:50%;margin:0 auto 10px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.auth-note{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;text-align:center}.sidebar{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:linear-gradient(165deg,#082f49 0%,#0b4d5f 58%,#0f766e 100%);color:#fff;padding:20px 16px;display:flex;flex-direction:column;z-index:30;overflow:auto;box-shadow:8px 0 30px rgba(8,47,73,.12)}
     .brand{display:flex;gap:12px;align-items:center;padding:4px 7px 22px;border-bottom:1px solid rgba(255,255,255,.14)}.brand img{width:58px;height:58px;border-radius:50%;background:#fff;border:3px solid rgba(255,255,255,.82);object-fit:cover}.brand strong{display:block;font-size:16px;letter-spacing:.03em}.brand small{display:block;color:#b9e5db;font-size:11px;margin-top:3px}
     .nav{display:grid;gap:4px;margin:18px 0}.nav-label{padding:10px 13px 5px;font-size:10px;font-weight:800;letter-spacing:.15em;color:#8ccdc1;text-transform:uppercase}.nav button{width:100%;border:0;background:transparent;color:#d8eef0;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:11px;text-align:left;font-weight:650;transition:.2s}.nav button:hover{background:rgba(255,255,255,.08);color:#fff}.nav button.active{background:#fff;color:var(--teal);box-shadow:0 8px 18px rgba(4,35,55,.18)}.nav .ico{width:22px;text-align:center;font-size:17px}
     .teacher-mini{margin-top:auto;padding:13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:16px;display:flex;align-items:center;gap:10px}.teacher-mini img{width:42px;height:42px;border-radius:13px;object-fit:cover;object-position:50% 34%;border:2px solid rgba(255,255,255,.7)}.teacher-mini strong{display:block;font-size:13px}.teacher-mini small{color:#b9e5db}
@@ -44,7 +44,22 @@
   </style>
 </head>
 <body>
-  <div class="app">
+  <div class="auth-screen" id="authScreen">
+    <div class="auth-card">
+      <div class="auth-brand"><img src="assets/logo-duc.jpg" alt="Logo DUC"><div><strong>LỚP HỌC THẦY ĐỨC</strong><span>Học chắc • Hiểu bản chất • Tiến bộ rõ ràng</span></div></div>
+      <h1>Đăng nhập quản lý</h1>
+      <p>Hệ thống dành riêng cho giáo viên. Vui lòng đăng nhập để tiếp tục.</p>
+      <div class="auth-checking" id="authChecking"><div class="auth-spinner"></div>Đang kiểm tra phiên đăng nhập…</div>
+      <form class="auth-form" id="loginForm" onsubmit="login(event)" hidden>
+        <div class="field"><label>Tên đăng nhập</label><input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="Nhập tên đăng nhập"></div>
+        <div class="field"><label>Mật khẩu</label><input name="password" type="password" autocomplete="current-password" required placeholder="Nhập mật khẩu"></div>
+        <div class="auth-error" id="authError" role="alert"></div>
+        <button class="btn primary" id="loginButton" type="submit">Đăng nhập</button>
+      </form>
+      <div class="auth-note">🔒 Mật khẩu được xác thực trực tiếp qua Supabase và không được lưu trong mã nguồn website.</div>
+    </div>
+  </div>
+  <div class="app" id="classroomApp">
     <aside class="sidebar" id="sidebar">
       <div class="brand"><img src="assets/logo-duc.jpg" alt="Logo DUC"><div><strong>LỚP HỌC THẦY ĐỨC</strong><small>Học chắc • Hiểu bản chất</small></div></div>
       <nav class="nav" id="nav">
@@ -66,7 +81,7 @@
     </aside>
     <div class="overlay" id="overlay"></div>
     <main class="main">
-      <header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="menu-btn" id="menuBtn">☰</button><div><h1 id="pageTitle">Tổng quan</h1><div class="today" id="todayText"></div></div></div><div class="top-actions"><button class="icon-btn" title="Xuất dữ liệu" onclick="exportData()">⇩</button><img class="avatar" src="assets/thay-duc.jpg" alt="Thầy Đức"></div></header>
+      <header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="menu-btn" id="menuBtn">☰</button><div><h1 id="pageTitle">Tổng quan</h1><div class="today" id="todayText"></div></div></div><div class="top-actions"><button class="icon-btn" title="Xuất dữ liệu" onclick="exportData()">⇩</button><button class="btn outline small" onclick="logout()">Đăng xuất</button><img class="avatar" src="assets/thay-duc.jpg" alt="Thầy Đức"></div></header>
       <div class="content">
         <section class="view active" id="dashboard">
           <div class="hero"><div><h2>Chào buổi sáng, Thầy Đức! 👋</h2><p>Chúc thầy một ngày dạy học thật nhiều năng lượng và hiệu quả.</p></div><div class="datebox"><b id="heroDay"></b><span id="heroMonth"></span></div></div>
@@ -141,11 +156,24 @@
   </div>
   <div class="modal-backdrop" id="modalBackdrop"><div class="modal"><div class="modal-head"><h3 id="modalTitle"></h3><button class="close" onclick="closeModal()">✕</button></div><div id="modalBody"></div></div></div>
   <div class="toast" id="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const money=n=>new Intl.NumberFormat('vi-VN').format(n||0)+'đ';
     const dateVN=s=>new Date(s+'T12:00:00').toLocaleDateString('vi-VN');
     const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    const SUPABASE_URL='https://ciuumhrjmhbtqvxxplkv.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY='sb_publishable_u05uKoArlUZn_OMtS5aVgA__W3np9Hb';
+    const AUTH_USERNAME='lehuuducdhsp';
+    const AUTH_EMAIL='lehuuducdhsp@gmail.com';
+    let supabaseClient=null;
+    const isAuthorized=session=>session?.user?.email?.toLowerCase()===AUTH_EMAIL;
+    function setAuthError(message=''){const el=document.getElementById('authError');el.textContent=message;el.classList.toggle('show',Boolean(message))}
+    function showLogin(message=''){document.getElementById('classroomApp').style.display='none';document.getElementById('authScreen').style.display='grid';document.getElementById('authChecking').hidden=true;document.getElementById('loginForm').hidden=false;setAuthError(message)}
+    function showApp(){document.getElementById('authScreen').style.display='none';document.getElementById('classroomApp').style.display='block';renderAll()}
+    async function initAuth(){if(!window.supabase?.createClient){showLogin('Không tải được hệ thống xác thực. Vui lòng kiểm tra mạng và tải lại trang.');return}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});try{const{data,error}=await supabaseClient.auth.getSession();if(error)throw error;if(isAuthorized(data.session)){showApp()}else{if(data.session)await supabaseClient.auth.signOut();showLogin()}supabaseClient.auth.onAuthStateChange((_event,session)=>{if(isAuthorized(session))showApp();else showLogin()})}catch{showLogin('Chưa thể kết nối Supabase. Vui lòng tải lại trang sau ít phút.')}}
+    async function login(event){event.preventDefault();if(!supabaseClient){setAuthError('Hệ thống xác thực chưa sẵn sàng. Vui lòng tải lại trang.');return}const form=event.currentTarget,username=form.username.value.trim().toLowerCase(),password=form.password.value,button=document.getElementById('loginButton');setAuthError('');if(username!==AUTH_USERNAME){setAuthError('Tên đăng nhập hoặc mật khẩu không đúng.');return}button.disabled=true;button.textContent='Đang đăng nhập…';try{const{data,error}=await supabaseClient.auth.signInWithPassword({email:AUTH_EMAIL,password});if(error)throw error;if(!isAuthorized(data.session)){await supabaseClient.auth.signOut();throw new Error('unauthorized')}form.password.value='';showApp()}catch(error){const message=String(error?.message||'').toLowerCase();setAuthError(message.includes('confirm')?'Tài khoản chưa được xác nhận trong Supabase. Hãy bật Auto Confirm User.':'Tên đăng nhập hoặc mật khẩu không đúng.')}finally{button.disabled=false;button.textContent='Đăng nhập'}}
+    async function logout(){try{await supabaseClient?.auth.signOut()}finally{showLogin();toast('Đã đăng xuất an toàn.')}}
     const isoLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const dateObj=s=>new Date((s||isoLocal(new Date()))+'T12:00:00');
     const mondayISO=value=>{const d=value instanceof Date?new Date(value):dateObj(value),day=d.getDay()||7;d.setDate(d.getDate()-day+1);return isoLocal(d)};
@@ -324,7 +352,7 @@
     function resetData(){if(confirm('Khôi phục dữ liệu mẫu? Dữ liệu đang nhập sẽ bị thay thế.')){db=structuredClone(initial);normalizeSchedules();save();toast('Đã khôi phục dữ liệu mẫu.')}}
     function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.classList.remove('show'),2300)}
     function renderAll(){setDates();renderDashboard();renderStudents();renderSchedule();renderTimetable();renderAttendance();renderScores();renderAssignments();renderTuition();renderDocs();fillStudentSelects();renderReport()}
-    renderAll();
+    initAuth();
   </script>
 </body>
 </html>
