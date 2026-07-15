@@ -6,6 +6,8 @@ Lịch học được lưu theo ngày cụ thể và dùng chung cho mọi màn 
 
 Phần học phí có sổ giao dịch đã thu, công nợ, tiền dư, chu kỳ thu tự động theo `số buổi/tuần × 4`, chu kỳ chỉnh riêng từng học sinh, ngày dự kiến thu tiếp theo và doanh thu dự kiến từ lịch tương lai đã xếp.
 
+Hồ sơ học sinh dùng trạng thái xanh cho đang học, đỏ cho đã nghỉ. Khi xóa một học sinh, hệ thống yêu cầu xác nhận và dọn toàn bộ lịch, điểm danh, điểm số, bài tập và giao dịch học phí liên quan.
+
 Trang được bảo vệ bằng Supabase Auth, chỉ tài khoản giáo viên đã được cấp quyền mới mở được bảng điều khiển. Mật khẩu không được lưu trong mã nguồn.
 
 Dữ liệu nghiệp vụ hiện vẫn được lưu bằng `localStorage` trên trình duyệt. Bước tiếp theo là chuyển các bảng học sinh, lịch học, điểm danh, điểm số và học phí sang Supabase với Row Level Security.
