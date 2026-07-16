@@ -90,6 +90,17 @@ test('lịch tương lai của học sinh đã nghỉ không xuất hiện trên
   dom.window.close();
 });
 
+test('lịch học nhiều tuần có cột STT tự động', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval('renderSchedule()');
+  const headers = [...window.document.querySelectorAll('#schedule thead th')].map(item => item.textContent.trim());
+  const firstCell = window.document.querySelector('#scheduleTable tr td');
+  assert.equal(headers[0], 'STT');
+  assert.equal(firstCell.textContent.trim(), '1');
+  dom.window.close();
+});
+
 test('trang quản trị có khu vực quản lý tài khoản học sinh an toàn', () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
   assert.match(source, /id="studentAccounts"/);
