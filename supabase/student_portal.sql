@@ -25,6 +25,7 @@ create index if not exists student_accounts_owner_idx
 
 alter table public.student_accounts enable row level security;
 revoke all on table public.student_accounts from anon, authenticated;
+grant select, insert, update, delete on table public.student_accounts to service_role;
 
 -- Nhật ký không chứa mật khẩu hoặc mã bí mật.
 create table if not exists public.student_account_audit (
@@ -42,6 +43,8 @@ create index if not exists student_account_audit_owner_created_idx
 
 alter table public.student_account_audit enable row level security;
 revoke all on table public.student_account_audit from anon, authenticated;
+grant select, insert, update, delete on table public.student_account_audit to service_role;
+grant usage, select on sequence public.student_account_audit_id_seq to service_role;
 
 commit;
 
