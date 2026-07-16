@@ -1,4 +1,4 @@
-const CACHE_NAME='duc-classroom-2026.07.16.5';
+const CACHE_NAME='duc-classroom-2026.07.17.1';
 const LOCAL_CORE=[
   './',
   './index.html',
