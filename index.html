@@ -45,9 +45,6 @@
     @media(max-width:860px){.sidebar{transform:translateX(-103%);transition:.25s}.sidebar.open{transform:none}.main{margin-left:0}.menu-btn{display:grid}.topbar{padding:0 16px}.content{padding:20px 15px 34px}.grid-2,.grid-equal,.settings-profile{grid-template-columns:1fr}.student-grid,.assignment-grid{grid-template-columns:1fr}.doc-grid{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.hero .datebox{display:none}.top-actions .today{display:none}.undo-label{display:none}.undo-btn{width:42px;padding:0}.overlay{position:fixed;inset:0;background:rgba(2,22,35,.4);z-index:25;display:none}.overlay.show{display:block}.timetable-summary,.timetable-summary.five{grid-template-columns:repeat(2,1fr)}.timetable-bar{align-items:flex-start;flex-direction:column}.timetable-wrap{max-height:none}.tuition-debt-table thead,.tuition-history-table thead{display:none}.tuition-debt-table,.tuition-debt-table tbody,.tuition-debt-table tr,.tuition-debt-table td,.tuition-history-table,.tuition-history-table tbody,.tuition-history-table tr,.tuition-history-table td{display:block;width:100%}.tuition-debt-table tr,.tuition-history-table tr{padding:12px;border-bottom:1px solid var(--line)}.tuition-debt-table tr:last-child,.tuition-history-table tr:last-child{border-bottom:0}.tuition-debt-table td,.tuition-history-table td{display:grid;grid-template-columns:130px 1fr;gap:10px;border:0;padding:7px 8px}.tuition-debt-table td::before,.tuition-history-table td::before{content:attr(data-label);font-size:10px;font-weight:850;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}.tuition-debt-table td:last-child,.tuition-history-table td:last-child{padding-bottom:12px}}
     @media(max-width:560px){.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:13px;display:block}.stat .stat-ico{width:40px;height:40px;margin-bottom:8px}.stat b{font-size:20px}.page-head{align-items:flex-start;flex-direction:column}.toolbar,.search,.search input,.select-filter{width:100%}.doc-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.report-summary{grid-template-columns:1fr}.fee-kpis{grid-template-columns:1fr}.hero{padding:23px}.hero h2{font-size:22px}.schedule-item{grid-template-columns:62px 6px 1fr}.schedule-item>.badge{display:none}.week-controls{width:100%}.week-picker{flex:1}.detail-kpis{grid-template-columns:1fr 1fr}.student-schedule-row{grid-template-columns:1fr;gap:2px}}
     .btn.soft.filter-active{background:#fff7ed;border-color:#fdba74;color:#c2410c;box-shadow:0 0 0 3px rgba(251,146,60,.12)}
-    .timetable-wrap{overflow-x:scroll;overflow-y:auto}
-    .timetable{width:max(100%,1480px);min-width:1480px}
-    .timetable.student-focus{width:2380px;min-width:2380px}
     @media print{.sidebar,.topbar,.page-head,.no-print{display:none!important}.main{margin:0}.content{padding:0;max-width:none}.view{display:none!important}#reports.view{display:block!important}.card{box-shadow:none;border:0}.grid-2{display:block}.report-preview{border:0}.report-controls{display:none}body.print-timetable #reports.view{display:none!important}body.print-timetable #timetable.view{display:block!important}body.print-timetable .timetable-summary,body.print-timetable .timetable-bar .legend{display:none!important}body.print-timetable .timetable-card{display:block!important;border:0}body.print-timetable .timetable-wrap{overflow:visible;max-height:none}body.print-timetable .timetable,body.print-timetable .timetable.student-focus{width:100%;min-width:0;font-size:9px}body.print-timetable .timetable th{position:static;padding:6px 3px}body.print-timetable .timetable .time-col{position:static;width:90px;min-width:90px;padding:5px 2px}body.print-timetable .timetable td{height:58px;padding:3px}body.print-timetable .lesson-chip{min-height:50px;padding:5px;font-size:9px;box-shadow:inset 0 0 0 1px #94a3b8}body.print-timetable .lesson-content{padding-right:0}body.print-timetable .lesson-trash,body.print-timetable .lesson-attendance{display:none!important}body.print-timetable .lesson-chip strong{font-size:9px}body.print-timetable .lesson-chip small{font-size:7px}}
   </style>
 </head>
@@ -117,8 +114,7 @@
           <div class="timetable-summary five" id="timetableSummary"></div>
           <div class="card timetable-card">
             <div class="timetable-bar"><div class="timetable-title"><b id="timetableWeek">Lịch dạy cố định trong tuần</b><span id="timetableViewNote">Nhấn vào một ô có lịch để chỉnh sửa nhanh.</span></div><div class="legend" id="timetableLegend"></div></div>
-            <div class="timetable-scroll-control no-print"><b>Thứ 2</b><input id="timetableHorizontalScroll" type="range" min="0" max="0" value="0" aria-label="Kéo ngang từ Thứ 2 đến Chủ nhật" oninput="setTimetableHorizontalScroll(this.value)"><b>Chủ nhật</b></div>
-            <div class="timetable-wrap" id="timetableWrap" onscroll="syncTimetableHorizontalScroll()"><table class="timetable"><thead id="timetableHead"></thead><tbody id="timetableBody"></tbody></table></div>
+            <div class="timetable-wrap" id="timetableWrap"><table class="timetable"><thead id="timetableHead"></thead><tbody id="timetableBody"></tbody></table></div>
           </div>
         </section>
 
@@ -288,9 +284,6 @@
       const items=db.schedules.filter(s=>s.weekStart===selectedWeekStart&&(filter.value==='all'||s.student===filter.value));
       const taughtItems=items.filter(isTaughtSchedule);
       const visibleItems=hideTaughtTimetable?items.filter(s=>!isTaughtSchedule(s)):items;
-      const table=document.querySelector('#timetableWrap .timetable');
-      table?.classList.toggle('student-focus',filter.value!=='all');
-
       const toggle=document.getElementById('taughtScheduleToggle');
       if(toggle){
         toggle.disabled=!taughtItems.length&&!hideTaughtTimetable;
@@ -319,10 +312,7 @@
       document.getElementById('timetableLegend').innerHTML=activeIds.map(id=>{const c=studentColor(id);return `<span class="legend-item"><i class="legend-dot" style="background:${c.bg};border:1px solid ${c.line}"></i>${esc(student(id).name)}</span>`}).join('')||'<span class="sub">Không còn buổi nào đang hiển thị</span>';
       const hours=items.reduce((t,s)=>t+durationHours(s.time),0),days=new Set(items.map(s=>s.day)).size,weekEnd=addDaysISO(selectedWeekStart,6),chargedAttendance=linkedAttendanceRecords().filter(a=>a.date>=selectedWeekStart&&a.date<=weekEnd&&a.charged&&(filter.value==='all'||a.student===filter.value)),actualIncome=chargedAttendance.reduce((total,a)=>total+student(a.student).fee,0),plannedIncome=items.reduce((total,s)=>{const record=attendanceForSchedule(s);return total+(record&&!record.charged?0:student(s.student).fee)},0);
       document.getElementById('timetableSummary').innerHTML=`<div class="mini-stat"><b>${items.length}</b><span>Buổi dạy trong lịch gốc</span></div><div class="mini-stat"><b>${hours.toLocaleString('vi-VN',{maximumFractionDigits:1})} giờ</b><span>Tổng thời lượng dự kiến</span></div><div class="mini-stat"><b>${days}/7 ngày</b><span>Ngày có lịch dạy</span></div><div class="mini-stat"><b style="color:${officialConflictPairs?'#dc2626':'#059669'}">${officialConflictPairs}</b><span>Cặp lịch bị chồng giờ</span></div><div class="mini-stat"><b style="color:#059669">${money(plannedIncome)}</b><span>Học phí dự kiến theo lịch</span><span class="stat-detail">Đã phát sinh: ${money(actualIncome)}</span></div>`;
-      requestAnimationFrame(syncTimetableHorizontalScroll);
     }
-    function setTimetableHorizontalScroll(value){const wrap=document.getElementById('timetableWrap');if(wrap)wrap.scrollLeft=Number(value)||0}
-    function syncTimetableHorizontalScroll(){const wrap=document.getElementById('timetableWrap'),control=document.getElementById('timetableHorizontalScroll');if(!wrap||!control)return;const max=Math.max(0,wrap.scrollWidth-wrap.clientWidth);control.max=String(max);control.value=String(Math.min(max,wrap.scrollLeft));control.disabled=max<2}
     function toggleTaughtSchedules(){
       const filter=document.getElementById('timetableStudent')?.value||'all';
       const count=db.schedules.filter(s=>s.weekStart===selectedWeekStart&&(filter==='all'||s.student===filter)&&isTaughtSchedule(s)).length;
@@ -421,7 +411,6 @@
     function refreshCloudWhenActive(){if(document.getElementById('classroomApp').style.display!=='block'||cloudSaving||!isAuthorized(currentSession))return;if(!cloudRowReady){loadCloudState();return}if(cloudDirty)writeCloudState();else loadCloudState()}
     initAuth();
     window.addEventListener('focus',refreshCloudWhenActive);
-    window.addEventListener('resize',syncTimetableHorizontalScroll);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshCloudWhenActive()});
     window.addEventListener('online',refreshCloudWhenActive);
     window.setInterval(()=>{if(document.getElementById('classroomApp').style.display==='block'){setDates();renderDashboard();refreshCloudWhenActive()}},60000);
