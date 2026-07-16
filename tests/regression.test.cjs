@@ -117,6 +117,8 @@ test('bảng tài khoản bật RLS và không cấp quyền trực tiếp cho t
   const sql = fs.readFileSync(studentSqlPath, 'utf8');
   assert.match(sql, /student_accounts enable row level security/i);
   assert.match(sql, /revoke all on table public\.student_accounts from anon, authenticated/i);
+  assert.match(sql, /grant select, insert, update, delete on table public\.student_accounts to service_role/i);
+  assert.match(sql, /grant usage, select on sequence public\.student_account_audit_id_seq to service_role/i);
   assert.doesNotMatch(sql, /password\s+(text|varchar)/i);
 });
 
