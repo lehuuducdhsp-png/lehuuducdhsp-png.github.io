@@ -1,7 +1,10 @@
-const CACHE_NAME='duc-classroom-2026.07.16.4';
+const CACHE_NAME='duc-classroom-2026.07.16.5';
 const LOCAL_CORE=[
   './',
   './index.html',
+  './student/',
+  './student/index.html',
+  './student/manifest.webmanifest',
   './manifest.webmanifest',
   './assets/logo-duc.jpg',
   './assets/thay-duc.jpg'
@@ -45,11 +48,13 @@ self.addEventListener('fetch',event=>{
         const response=await fetch(request,{cache:'no-store'});
         if(response.ok){
           const cache=await caches.open(CACHE_NAME);
-          cache.put('./index.html',response.clone());
+          cache.put(url.pathname.includes('/student/')?'./student/index.html':'./index.html',response.clone());
         }
         return response;
       }catch{
-        return (await caches.match('./index.html'))||(await caches.match('./'));
+        return url.pathname.includes('/student/')
+          ?(await caches.match('./student/index.html'))
+          :(await caches.match('./index.html'))||(await caches.match('./'));
       }
     })());
     return;
