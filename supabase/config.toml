@@ -1,0 +1,4 @@
+project_id = "ciuumhrjmhbtqvxxplkv"
+
+[functions.student-portal]
+verify_jwt = true
