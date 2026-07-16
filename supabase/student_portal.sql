@@ -46,6 +46,9 @@ revoke all on table public.student_account_audit from anon, authenticated;
 grant select, insert, update, delete on table public.student_account_audit to service_role;
 grant usage, select on sequence public.student_account_audit_id_seq to service_role;
 
+-- Edge Function chỉ cần đọc bản dữ liệu lớp để lọc đúng hồ sơ học sinh.
+grant select on table public.classroom_state to service_role;
+
 commit;
 
 select
