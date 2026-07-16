@@ -5,6 +5,9 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
 const sourcePath = path.join(__dirname, '..', 'index.html');
+const studentSourcePath = path.join(__dirname, '..', 'student', 'index.html');
+const edgeFunctionPath = path.join(__dirname, '..', '..', 'supabase', 'functions', 'student-portal', 'index.ts');
+const studentSqlPath = path.join(__dirname, '..', '..', 'supabase', 'student_portal.sql');
 const html = fs.readFileSync(sourcePath, 'utf8')
   .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
 
@@ -85,4 +88,34 @@ test('lịch tương lai của học sinh đã nghỉ không xuất hiện trên
   window.eval(`db.students[0].status='inactive'; db.attendance=[]; db.schedules[0].date=addDaysISO(vietnamNow().date,1); db.schedules[0].weekStart=mondayISO(db.schedules[0].date); renderDashboard()`);
   assert.equal(window.document.querySelector('#todaySchedule').textContent.includes('BẢO AN'), false);
   dom.window.close();
+});
+
+test('trang quản trị có khu vực quản lý tài khoản học sinh an toàn', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  assert.match(source, /id="studentAccounts"/);
+  assert.match(source, /Cấp lại mật khẩu/);
+  assert.match(source, /hệ thống không lưu và không hiển thị lại mật khẩu cũ/);
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY\s*=/);
+});
+
+test('cổng học sinh không hiển thị học phí hoặc khóa quản trị', () => {
+  const source = fs.readFileSync(studentSourcePath, 'utf8');
+  assert.match(source, /Cổng thông tin dành riêng cho học sinh/);
+  assert.match(source, /storageKey:'duc-student-auth'/);
+  assert.doesNotMatch(source, /unitFee|paymentTransactions|Học phí|service_role/i);
+});
+
+test('Edge Function lọc dữ liệu theo đúng student_id và không trả tiền học phí', () => {
+  const source = fs.readFileSync(edgeFunctionPath, 'utf8');
+  assert.match(source, /item\?\.student === studentId/);
+  assert.match(source, /user\.app_metadata\?\.role !== 'student'/);
+  assert.match(source, /\['id', 'scheduleId', 'date', 'time', 'subject', 'status'/);
+  assert.doesNotMatch(source, /fields\(item, \[[^\]]*unitFee/);
+});
+
+test('bảng tài khoản bật RLS và không cấp quyền trực tiếp cho trình duyệt', () => {
+  const sql = fs.readFileSync(studentSqlPath, 'utf8');
+  assert.match(sql, /student_accounts enable row level security/i);
+  assert.match(sql, /revoke all on table public\.student_accounts from anon, authenticated/i);
+  assert.doesNotMatch(sql, /password\s+(text|varchar)/i);
 });
