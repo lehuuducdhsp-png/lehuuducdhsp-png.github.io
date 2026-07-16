@@ -2,10 +2,10 @@
 -- Kho tài liệu là riêng tư; mỗi tài khoản chỉ truy cập thư mục mang UID của mình.
 
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('classroom-documents', 'classroom-documents', false, 26214400)
+values ('classroom-documents', 'classroom-documents', false, 52428800)
 on conflict (id) do update
 set public = false,
-    file_size_limit = 26214400;
+    file_size_limit = 52428800;
 
 drop policy if exists "classroom_documents_select_own" on storage.objects;
 create policy "classroom_documents_select_own"
