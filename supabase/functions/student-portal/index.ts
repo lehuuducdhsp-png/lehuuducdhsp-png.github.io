@@ -102,6 +102,25 @@ async function teacherAction(req: Request, user: any, body: Record<string, unkno
   const studentId = safeText(body.studentId, 100)
   if (!studentId) return response(req, { error: 'Thiếu học sinh.' }, 400)
 
+  if (action === 'preview_student') {
+    const state = await classroom(ownerId)
+    const dashboard = studentDashboard(state, studentId)
+    if (!dashboard) return response(req, { error: 'Không tìm thấy hồ sơ học sinh.' }, 404)
+    const { data: account, error: accountError } = await admin
+      .from('student_accounts')
+      .select('username, status')
+      .eq('owner_id', ownerId)
+      .eq('student_id', studentId)
+      .maybeSingle()
+    if (accountError) throw accountError
+    await audit(ownerId, studentId, 'teacher_preview_student', user.id)
+    return response(req, {
+      preview: true,
+      dashboard,
+      account: account ? { username: account.username, status: account.status } : null,
+    })
+  }
+
   if (action === 'create_account') {
     const username = cleanUsername(body.username)
     const password = validatePassword(body.password)
