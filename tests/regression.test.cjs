@@ -119,3 +119,16 @@ test('bảng tài khoản bật RLS và không cấp quyền trực tiếp cho t
   assert.match(sql, /revoke all on table public\.student_accounts from anon, authenticated/i);
   assert.doesNotMatch(sql, /password\s+(text|varchar)/i);
 });
+
+test('giáo viên xem như học sinh mà không cần hoặc thay đổi mật khẩu', () => {
+  const teacher = fs.readFileSync(sourcePath, 'utf8');
+  const student = fs.readFileSync(studentSourcePath, 'utf8');
+  const edge = fs.readFileSync(edgeFunctionPath, 'utf8');
+  assert.match(teacher, /Xem như học sinh/);
+  assert.match(teacher, /action:'preview_student'/);
+  assert.match(student, /TEACHER_PREVIEW/);
+  assert.match(student, /duc-teacher-preview-data/);
+  assert.match(edge, /action === 'preview_student'/);
+  assert.match(edge, /teacher_preview_student/);
+  assert.doesNotMatch(edge.match(/if \(action === 'preview_student'\)[\s\S]*?\n  }/)?.[0] || '', /updateUserById|password/);
+});
