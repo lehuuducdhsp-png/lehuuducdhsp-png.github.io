@@ -101,6 +101,20 @@ test('lịch học nhiều tuần có cột STT tự động', async () => {
   dom.window.close();
 });
 
+test('bảng điểm có chú thích rõ mức đạt và chưa đạt', async () => {
+  const { dom, window } = await createApp();
+  window.eval('openScoreGuide()');
+  const button = window.document.querySelector('[aria-label="Xem mức đánh giá bảng điểm"]');
+  const modalText = window.document.querySelector('#modalBody').textContent;
+  assert.ok(button);
+  assert.match(modalText, /8,00 – 10,00/);
+  assert.match(modalText, /5,00 – 6,49/);
+  assert.match(modalText, /Dưới 5,00/);
+  assert.match(modalText, /Chưa đạt/);
+  assert.match(modalText, /điểm 0 vẫn được đưa vào phép tính/i);
+  dom.window.close();
+});
+
 test('trang quản trị có khu vực quản lý tài khoản học sinh an toàn', () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
   assert.match(source, /id="studentAccounts"/);
