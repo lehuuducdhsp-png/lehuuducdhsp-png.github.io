@@ -1,0 +1,11 @@
+{
+  "name": "Cổng học sinh - Lớp học Thầy Đức",
+  "short_name": "Cổng học sinh",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f7fa",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "../assets/logo-duc.jpg", "sizes": "500x500", "type": "image/jpeg", "purpose": "any maskable" }
+  ]
+}
