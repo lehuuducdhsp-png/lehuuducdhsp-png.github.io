@@ -1,0 +1,20 @@
+{
+  "name": "Lớp học Thầy Đức",
+  "short_name": "Lớp Thầy Đức",
+  "description": "Quản lý lịch học, điểm danh, học phí và tài liệu của Lớp học Thầy Đức.",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f8fb",
+  "theme_color": "#0f766e",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "assets/logo-duc.jpg",
+      "sizes": "500x500",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
+
