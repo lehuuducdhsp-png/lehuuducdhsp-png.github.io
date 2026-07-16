@@ -1,11 +1,12 @@
-const CACHE_NAME='duc-classroom-2026.07.16.2';
-const CORE=[
+const CACHE_NAME='duc-classroom-2026.07.16.3';
+const LOCAL_CORE=[
   './',
   './index.html',
   './manifest.webmanifest',
-  './version.json',
   './assets/logo-duc.jpg',
-  './assets/thay-duc.jpg',
+  './assets/thay-duc.jpg'
+];
+const OPTIONAL_CORE=[
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7',
   'https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js'
 ];
@@ -13,7 +14,8 @@ const CORE=[
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const cache=await caches.open(CACHE_NAME);
-    await Promise.allSettled(CORE.map(url=>cache.add(url)));
+    await cache.addAll(LOCAL_CORE);
+    await Promise.allSettled(OPTIONAL_CORE.map(url=>cache.add(url)));
     await self.skipWaiting();
   })());
 });
@@ -21,7 +23,7 @@ self.addEventListener('install',event=>{
 self.addEventListener('activate',event=>{
   event.waitUntil((async()=>{
     const names=await caches.keys();
-    await Promise.all(names.filter(name=>name!==CACHE_NAME).map(name=>caches.delete(name)));
+    await Promise.all(names.filter(name=>name.startsWith('duc-classroom-')&&name!==CACHE_NAME).map(name=>caches.delete(name)));
     await self.clients.claim();
   })());
 });
@@ -35,11 +37,12 @@ self.addEventListener('fetch',event=>{
   if(request.method!=='GET')return;
   const url=new URL(request.url);
   if(url.hostname.endsWith('.supabase.co'))return;
+  if(url.origin===self.location.origin&&url.pathname.endsWith('/version.json'))return;
 
   if(request.mode==='navigate'){
     event.respondWith((async()=>{
       try{
-        const response=await fetch(request);
+        const response=await fetch(request,{cache:'no-store'});
         if(response.ok){
           const cache=await caches.open(CACHE_NAME);
           cache.put('./index.html',response.clone());
@@ -54,12 +57,14 @@ self.addEventListener('fetch',event=>{
 
   event.respondWith((async()=>{
     const cached=await caches.match(request);
+    const network=fetch(request).then(async response=>{
+      if(response.ok||response.type==='opaque'){
+        const cache=await caches.open(CACHE_NAME);
+        await cache.put(request,response.clone());
+      }
+      return response;
+    });
     if(cached)return cached;
-    const response=await fetch(request);
-    if(response.ok||response.type==='opaque'){
-      const cache=await caches.open(CACHE_NAME);
-      cache.put(request,response.clone());
-    }
-    return response;
+    return network;
   })());
 });
