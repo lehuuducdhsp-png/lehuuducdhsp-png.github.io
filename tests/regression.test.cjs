@@ -105,6 +105,30 @@ test('cổng học sinh không hiển thị học phí hoặc khóa quản trị
   assert.doesNotMatch(source, /unitFee|paymentTransactions|Học phí|service_role/i);
 });
 
+test('cổng học sinh ghép đúng điểm danh cũ chưa có scheduleId', async () => {
+  const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
+    .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
+  const dom = new JSDOM(studentHtml, {
+    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1',
+    runScripts: 'dangerously',
+    pretendToBeVisual: true,
+    beforeParse(window) {
+      window.scrollTo = () => {};
+      window.open = () => null;
+    }
+  });
+  dom.window.eval(`data={
+    profile:{id:'s1',name:'BẢO AN',full:'BẢO AN',grade:9,subjects:'KHTN'},
+    schedules:[{id:'sch-old',date:'2026-07-05',time:'18:30–20:00',subject:'Hóa học 9',mode:'Trực tiếp'}],
+    attendance:[{id:'att-old',date:'2026-07-05',time:'18:30',subject:'Hóa học 9',status:'present'}],
+    scores:[],assignments:[]
+  }; account={username:'bao.an'}; renderAll();`);
+  const rowText = dom.window.document.querySelector('#scheduleRows').textContent;
+  assert.match(rowText, /Có mặt/);
+  assert.doesNotMatch(rowText, /Chưa điểm danh|Chưa ghi/);
+  dom.window.close();
+});
+
 test('Edge Function lọc dữ liệu theo đúng student_id và không trả tiền học phí', () => {
   const source = fs.readFileSync(edgeFunctionPath, 'utf8');
   assert.match(source, /item\?\.student === studentId/);
