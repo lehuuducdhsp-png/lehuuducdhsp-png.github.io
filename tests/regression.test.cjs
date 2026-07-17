@@ -164,30 +164,36 @@ test('chỉnh sửa bài tập giữ nguyên bản ghi và cập nhật đủ n�
   dom.window.close();
 });
 
-test('tổng đã thu tách hiện tại và lịch sử, mỗi khoản chỉ cộng một lần', async () => {
+test('tổng LS lưu cộng cả hồ sơ đã nghỉ và mỗi khoản chỉ cộng một lần', async () => {
   const { dom, window } = await createApp();
   seed(window);
   window.eval(`
     db.schedules.push({id:'sch2',student:'s1',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'18:30–20:00',subject:'Toán 9',mode:'Trực tiếp'});
     db.attendance.push({id:'att2',scheduleId:'sch2',student:'s1',date:'2026-07-07',time:'18:30',subject:'Toán 9',status:'present',charged:true,unitFee:200000});
     db.paymentTransactions.push({id:'p2',student:'s1',date:'2026-07-07',periodStart:'2026-07-07',periodEnd:'2026-07-07',periodStartTime:'18:30',periodEndTime:'20:00',periodSessionIds:['att2'],sessions:1,amount:200000,accountingMode:'current',locked:false,lockedSessionIds:[],note:''});
+    db.students.push({id:'s2',name:'NGỌC LINH',full:'NGỌC LINH',grade:7,fee:600000,status:'inactive',subjects:'Toán',mode:'1:1'});
+    db.schedules.push({id:'sch3',student:'s2',date:'2026-07-08',weekStart:'2026-07-06',day:4,time:'15:30–17:00',subject:'Toán 7',mode:'Trực tiếp'});
+    db.attendance.push({id:'att3',scheduleId:'sch3',student:'s2',date:'2026-07-08',time:'15:30',subject:'Toán 7',status:'present',charged:true,unitFee:600000});
+    db.paymentTransactions.push({id:'p3',student:'s2',date:'2026-07-08',periodStart:'2026-07-08',periodEnd:'2026-07-08',periodStartTime:'15:30',periodEndTime:'17:00',periodSessionIds:['att3'],sessions:1,amount:600000,accountingMode:'history',locked:true,lockedSessionIds:['att3'],note:''});
     renderTuition();
   `);
   const audit = JSON.parse(window.eval('JSON.stringify(tuitionPaymentAudit())'));
   assert.equal(audit.currentTotal, 200000);
   assert.equal(audit.historyTotal, 150000);
   assert.equal(audit.activeTotal, 350000);
-  assert.equal(audit.allTotal, 350000);
+  assert.equal(audit.inactiveTotal, 600000);
+  assert.equal(audit.allCurrentTotal, 200000);
+  assert.equal(audit.allHistoryTotal, 750000);
+  assert.equal(audit.allTotal, 950000);
   assert.equal(audit.problemCount, 0);
   const totalText = window.document.querySelector('#feeTotal').textContent;
-  assert.match(totalText, /Thu hiện tại\s*200\.000đ/);
-  assert.match(totalText, /LS khóa sổ:\s*150\.000đ/);
-  assert.match(totalText, /Tổng khoản thu lưu:\s*350\.000đ/);
-  assert.doesNotMatch(totalText, /550\.000đ/);
+  assert.match(totalText, /TỔNG HỌC PHÍ ĐÃ PHÁT SINH TRONG HỆ THỐNG/);
+  assert.match(totalText, /Đã thu đối trừ\s*200\.000đ/);
+  assert.match(totalText, /Tổng LS lưu:\s*950\.000đ/);
   window.eval('openTuitionPaymentAudit()');
   const auditText = window.document.querySelector('#modalBody').textContent;
-  assert.match(auditText, /200\.000đ thu hiện tại \+ 150\.000đ lịch sử khóa sổ = 350\.000đ/);
-  assert.equal(window.document.querySelectorAll('#modalBody tbody tr').length, 2);
+  assert.match(auditText, /200\.000đ thu hiện tại \+ 750\.000đ lịch sử khóa sổ = 950\.000đ/);
+  assert.equal(window.document.querySelectorAll('#modalBody tbody tr').length, 3);
   dom.window.close();
 });
 
@@ -203,6 +209,29 @@ test('phiếu học phí mặc định xanh lá pastel và tên dài nằm trong
   assert.match(svg, /#4f9b76/);
   assert.match(svg, /NGUYỄN THỊ NGỌC TRÂM/);
   assert.match(svg, /x1="560"/);
+  dom.window.close();
+});
+
+test('phiếu học phí chọn được buổi chưa học đã có trong thời khóa biểu', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`
+    db.attendance=[];
+    db.schedules[0].date=addDaysISO(vietnamNow().date,2);
+    db.schedules[0].weekStart=mondayISO(db.schedules[0].date);
+  `);
+  window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
+  window.eval(`openTuitionNotice('s1')`);
+  const option = window.document.querySelector('#tuitionNoticeSessions input[value="schedule:sch1"]');
+  assert.ok(option);
+  assert.equal(option.checked, true);
+  assert.equal(window.eval('db.attendance.length'), 0);
+  const modalText = window.document.querySelector('#modalBody').textContent;
+  const posterText = window.document.querySelector('#tuitionPosterPreview').textContent;
+  assert.match(modalText, /Chưa học • Đã có trong TKB/);
+  assert.match(modalText, /1 buổi chưa học đã có TKB/);
+  assert.match(posterText, /LỊCH/);
+  assert.match(posterText, /150\.000đ/);
   dom.window.close();
 });
 
