@@ -5,6 +5,8 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
 const sourcePath = path.join(__dirname, '..', 'index.html');
+const tuitionPosterPath = path.join(__dirname, '..', 'tuition-poster.js');
+const serviceWorkerPath = path.join(__dirname, '..', 'sw.js');
 const studentSourcePath = path.join(__dirname, '..', 'student', 'index.html');
 const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'student-portal', 'index.ts');
 const studentSqlPath = path.join(__dirname, '..', 'supabase', 'student_portal.sql');
@@ -112,6 +114,27 @@ test('khoản thu hiện tại lưu đúng buổi cùng giờ bắt đầu và k
   assert.equal(payment.periodEndTime, '16:30');
   assert.equal(payment.sessions, 1);
   assert.equal(payment.amount, 150000);
+  dom.window.close();
+});
+
+test('tạo phiếu học phí gửi phụ huynh từ đúng các buổi đã lưu', async () => {
+  assert.match(fs.readFileSync(sourcePath, 'utf8'), /<script src="\.\/tuition-poster\.js"><\/script>/);
+  assert.match(fs.readFileSync(serviceWorkerPath, 'utf8'), /'\.\/tuition-poster\.js'/);
+  const { dom, window } = await createApp();
+  seed(window);
+  window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
+  window.eval(`openTuitionNotice('s1','p1')`);
+  assert.equal(window.document.querySelectorAll('#tuitionNoticeSessions input[name="noticeSession"]:checked').length, 1);
+  const posterText = window.document.querySelector('#tuitionPosterPreview').textContent;
+  assert.match(posterText, /LỊCH HỌC & HỌC PHÍ/);
+  assert.match(posterText, /BẢO AN/);
+  assert.match(posterText, /15h00/);
+  assert.match(posterText, /150\.000đ/);
+  assert.match(posterText, /Từ 15:00.*6\/7\/2026.*16:30.*6\/7\/2026/s);
+  assert.match(posterText, /0362975219/);
+  assert.match(window.document.querySelector('#modalBody').textContent, /Chia sẻ ảnh/);
+  assert.match(window.document.querySelector('#modalBody').textContent, /Tải PNG/);
+  assert.match(window.document.querySelector('#modalBody').textContent, /In \/ Lưu PDF/);
   dom.window.close();
 });
 
