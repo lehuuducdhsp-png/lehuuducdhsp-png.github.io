@@ -118,8 +118,12 @@ test('khoản thu hiện tại lưu đúng buổi cùng giờ bắt đầu và k
 });
 
 test('tạo phiếu học phí gửi phụ huynh từ đúng các buổi đã lưu', async () => {
-  assert.match(fs.readFileSync(sourcePath, 'utf8'), /<script src="\.\/tuition-poster\.js"><\/script>/);
-  assert.match(fs.readFileSync(serviceWorkerPath, 'utf8'), /'\.\/tuition-poster\.js'/);
+  const teacherSource = fs.readFileSync(sourcePath, 'utf8');
+  const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
+  const appVersion = teacherSource.match(/APP_VERSION='([^']+)'/)?.[1];
+  const posterVersion = teacherSource.match(/tuition-poster\.js\?v=([^"']+)/)?.[1];
+  assert.equal(posterVersion, appVersion);
+  assert.match(serviceWorker, new RegExp(`tuition-poster\\.js\\?v=${appVersion.replaceAll('.', '\\.')}`));
   const { dom, window } = await createApp();
   seed(window);
   window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
@@ -348,6 +352,27 @@ test('cổng học sinh có thời khóa biểu riêng nằm giữa Tổng quan 
   assert.match(dom.window.document.querySelector('#studentTimetableBody').textContent, /Hóa học 9/);
   assert.match(dom.window.document.querySelector('#studentTimetableWeek').textContent, /13\/0?7\/2026/);
   assert.match(dom.window.document.querySelector('#studentTimetableSummary').textContent, /1.*Buổi học trong tuần/s);
+  dom.window.close();
+});
+
+test('điện thoại có thêm bảng thời khóa biểu tuần cho cả giáo viên và học sinh', async () => {
+  const teacherSource = fs.readFileSync(sourcePath, 'utf8');
+  const studentSource = fs.readFileSync(studentSourcePath, 'utf8');
+  assert.match(teacherSource, /Kéo ngang để xem đủ 7 ngày/);
+  assert.match(teacherSource, /#timetable \.timetable-wrap\{display:block/);
+  assert.doesNotMatch(teacherSource, /#timetable \.timetable-wrap\{display:none/);
+  assert.match(studentSource, /Bảng chỉ có lịch của em/);
+  assert.match(studentSource, /\.student-timetable-wrap\{display:block/);
+  assert.doesNotMatch(studentSource, /\.student-timetable-wrap\{display:none/);
+
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`document.getElementById('timetableStudent').value='s1'; renderTimetable()`);
+  assert.equal(window.document.querySelectorAll('#timetableHead th').length, 8);
+  assert.match(window.document.querySelector('#timetableBody').textContent, /BẢO AN/);
+  assert.ok(window.document.querySelector('#timetableBody .lesson-trash'));
+  assert.ok(window.document.querySelector('#timetableBody .lesson-attendance'));
+  assert.ok(window.document.querySelector('#timetableBody .empty-slot'));
   dom.window.close();
 });
 
