@@ -319,6 +319,60 @@ test('điện thoại tự tải bản Supabase mới hơn khi mở lại trang'
   dom.window.close();
 });
 
+test('trình duyệt Zalo báo ngoại tuyến vẫn thử Supabase và tải dữ liệu mới', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+  const remote = JSON.parse(window.eval('JSON.stringify(db)'));
+  remote.students[0].name = 'BẢO AN TỪ MÁY TÍNH';
+  remote.students[0].full = 'NGUYỄN ĐÌNH BẢO AN TỪ MÁY TÍNH';
+  remote.tuitionNoticeSettings = JSON.parse(window.eval('JSON.stringify(tuitionNoticeDefaults)'));
+  window.__remoteClassroomState = remote;
+  await window.eval(`
+    currentSession={user:{id:'owner-1',email:AUTH_EMAIL}};
+    cloudRowReady=true;
+    cloudRevision=7;
+    cloudLastUpdated='2026-07-17T10:00:00Z';
+    cloudDirty=false;
+    window.__revisionRequests=0;
+    supabaseClient={
+      from(){return{
+        select(fields){return{eq(){return{maybeSingle:async()=>{
+          window.__revisionRequests++;
+          return fields==='revision, updated_at'
+            ?{data:{revision:8,updated_at:'2026-07-17T10:01:00Z'},error:null}
+            :{data:{data:window.__remoteClassroomState,revision:8,updated_at:'2026-07-17T10:01:00Z'},error:null};
+        }}}}}
+      }}
+    };
+    checkCloudRevision({manual:true})
+  `);
+  assert.ok(window.__revisionRequests >= 2);
+  assert.equal(window.eval(`db.students[0].name`), 'BẢO AN TỪ MÁY TÍNH');
+  assert.equal(window.eval(`cloudRevision`), 8);
+  assert.match(window.document.querySelector('#networkStatus').textContent, /Đã đồng bộ/);
+  dom.window.close();
+});
+
+test('điện thoại 0 dữ liệu không được phép ghi đè bản gốc Supabase', async () => {
+  const { dom, window, messages } = await createApp();
+  window.__rpcCalls = 0;
+  await window.eval(`
+    currentSession={user:{id:'owner-1',email:AUTH_EMAIL}};
+    db=structuredClone(initial);
+    supabaseClient={
+      from(){return{select(){return{eq(){return{maybeSingle:async()=>({data:null,error:null})}}}}}},
+      rpc(){window.__rpcCalls++;return Promise.resolve({data:null,error:null})}
+    };
+    initializeCloudFromDevice()
+  `);
+  assert.equal(window.__rpcCalls, 0);
+  assert.equal(window.eval('cloudRowReady'), false);
+  assert.match(messages.join('\n'), /không.*0 dữ liệu.*bản gốc/is);
+  assert.match(window.document.querySelector('#cloudStatusText').textContent, /thiết bị này đang trống/i);
+  dom.window.close();
+});
+
 test('lịch tương lai của học sinh đã nghỉ không xuất hiện trên tổng quan', async () => {
   const { dom, window } = await createApp();
   seed(window, { payment: false });
