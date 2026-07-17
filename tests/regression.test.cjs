@@ -66,6 +66,55 @@ test('đơn giá buổi cũ không đổi khi sửa học phí hiện tại', as
   dom.window.close();
 });
 
+test('giai đoạn học phí khóa đúng từng buổi và ghi rõ giờ ngày cùng buổi học bù', async () => {
+  const { dom, window } = await createApp();
+  window.eval(`db={
+    students:[{id:'s1',name:'BẢO AN',full:'BẢO AN',grade:9,fee:150000,status:'active',subjects:'KHTN',mode:'1:1'}],
+    schedules:[
+      {id:'sch1',student:'s1',date:'2026-07-06',weekStart:'2026-07-06',day:2,time:'15:00–16:30',subject:'Hóa học 9',mode:'Trực tiếp'},
+      {id:'sch2',student:'s1',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'18:30–20:00',subject:'Hóa học 9',mode:'Trực tiếp'},
+      {id:'sch3',student:'s1',date:'2026-07-08',weekStart:'2026-07-06',day:4,time:'10:00–11:30',subject:'Hóa học 9',mode:'Trực tiếp'}
+    ],
+    attendance:[
+      {id:'att1',scheduleId:'sch1',student:'s1',date:'2026-07-06',time:'15:00',subject:'Hóa học 9',status:'present',charged:true,unitFee:150000},
+      {id:'att2',scheduleId:'sch2',student:'s1',date:'2026-07-07',time:'18:30',subject:'Hóa học 9',status:'makeup',charged:true,unitFee:150000},
+      {id:'att3',scheduleId:'sch3',student:'s1',date:'2026-07-08',time:'10:00',subject:'Hóa học 9',status:'present',charged:true,unitFee:150000}
+    ],
+    scores:[],assignments:[],payments:{},documents:[],
+    paymentTransactions:[{id:'p1',student:'s1',date:'2026-07-08',periodStart:'2026-07-06',periodEnd:'2026-07-08',periodStartTime:'15:00',periodEndTime:'20:00',periodSessionIds:['att1','att2'],sessions:2,amount:300000,accountingMode:'history',locked:true,lockedSessionIds:['att1','att2'],note:''}]
+  }; renderAll();`);
+  const matchedIds = JSON.parse(window.eval(`JSON.stringify(historicalPaymentCoverage('s1').byPayment.p1.matchedIds)`));
+  assert.deepEqual(matchedIds, ['att1', 'att2']);
+  assert.equal(window.eval(`historicalPaymentCoverage('s1').covered.has(db.attendance[2])`), false);
+  const historyText = window.document.querySelector('#paymentHistoryTable').textContent;
+  assert.match(historyText, /15:00.*0?6\/0?7\/2026/s);
+  assert.match(historyText, /20:00.*0?7\/0?7\/2026/s);
+  assert.match(historyText, /1 buổi học bù/i);
+  window.eval(`openPaymentModal('s1','p1')`);
+  assert.equal(window.document.querySelectorAll('input[name="periodSession"]:checked').length, 2);
+  assert.match(window.document.querySelector('#paymentSelectionSummary').textContent, /1 buổi học bù/i);
+  dom.window.close();
+});
+
+test('khoản thu hiện tại lưu đúng buổi cùng giờ bắt đầu và kết thúc', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`openPaymentModal('s1','','current')`);
+  const form = window.document.querySelector('#modalBody form');
+  assert.equal(form.querySelectorAll('input[name="periodSession"]:checked').length, 1);
+  window.eval(`submitPayment({preventDefault(){},target:document.querySelector('#modalBody form')},'')`);
+  const payment = JSON.parse(window.eval('JSON.stringify(db.paymentTransactions[0])'));
+  assert.deepEqual(payment.periodSessionIds, ['att1']);
+  assert.deepEqual(payment.lockedSessionIds, []);
+  assert.equal(payment.periodStart, '2026-07-06');
+  assert.equal(payment.periodStartTime, '15:00');
+  assert.equal(payment.periodEnd, '2026-07-06');
+  assert.equal(payment.periodEndTime, '16:30');
+  assert.equal(payment.sessions, 1);
+  assert.equal(payment.amount, 150000);
+  dom.window.close();
+});
+
 test('kiểm tra toàn bộ cấu trúc khoản thu và tài liệu khi nhập JSON', async () => {
   const { dom, window } = await createApp();
   const malformed = { students: [], schedules: [], attendance: [], scores: [], assignments: [], paymentTransactions: {}, documents: 'sai' };

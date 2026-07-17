@@ -1,6 +1,6 @@
 {
   "name": "lop-hoc-thay-duc",
-  "version": "2026.7.17-3",
+  "version": "2026.7.17-4",
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs"
