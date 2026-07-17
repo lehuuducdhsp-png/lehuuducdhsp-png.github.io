@@ -293,9 +293,53 @@ test('lịch học nhiều tuần có cột STT tự động', async () => {
   seed(window, { payment: false });
   window.eval('renderSchedule()');
   const headers = [...window.document.querySelectorAll('#schedule thead th')].map(item => item.textContent.trim());
-  const firstCell = window.document.querySelector('#scheduleTable tr td');
-  assert.equal(headers[0], 'STT');
+  const firstCell = window.document.querySelector('#scheduleTable tr td:nth-child(2)');
+  assert.equal(headers[1], 'STT');
   assert.equal(firstCell.textContent.trim(), '1');
+  assert.match(window.document.querySelector('#scheduleTable').textContent, /Sửa.*Xóa/s);
+  dom.window.close();
+});
+
+test('lọc lịch theo học sinh và xóa hàng loạt đúng lịch đang chọn', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`
+    db.students.push({id:'s2',name:'NGỌC TRÂM',full:'NGỌC TRÂM',grade:6,fee:150000,status:'active',subjects:'Toán',mode:'1:1'});
+    db.schedules.push({id:'sch2',student:'s2',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'09:00–10:30',subject:'Toán số 6',mode:'Trực tiếp'});
+    db.attendance.push({id:'att2',scheduleId:'sch2',student:'s2',date:'2026-07-07',time:'09:00',subject:'Toán số 6',status:'present',charged:true,unitFee:150000});
+    db.assignments.push({id:'asg2',student:'s2',assignedDate:'2026-07-07',sessionId:'att2',subject:'Toán số 6',due:'2026-07-14',title:'Bài tập',status:'new',note:''});
+    renderSchedule();
+  `);
+  const filter = window.document.querySelector('#scheduleStudent');
+  assert.match(filter.textContent, /BẢO AN \(1 lịch\)/);
+  assert.match(filter.textContent, /NGỌC TRÂM \(1 lịch\)/);
+  filter.value = 's2';
+  window.eval(`setScheduleStudentFilter('s2')`);
+  assert.equal(window.document.querySelectorAll('#scheduleTable tr').length, 1);
+  assert.match(window.document.querySelector('#scheduleTable').textContent, /NGỌC TRÂM/);
+  assert.doesNotMatch(window.document.querySelector('#scheduleTable').textContent, /BẢO AN/);
+  const checkbox = window.document.querySelector('.bulk-check[data-type="schedules"]');
+  checkbox.checked = true;
+  window.eval(`updateBulkSelection('schedules')`);
+  assert.equal(window.document.querySelector('#deleteSelectedSchedules').disabled, false);
+  assert.match(window.document.querySelector('#scheduleSelectedCount').textContent, /1 lịch đã chọn/);
+  window.eval('deleteSelectedSchedules()');
+  assert.equal(window.eval(`db.schedules.some(item=>item.id==='sch2')`), false);
+  assert.equal(window.eval(`db.schedules.some(item=>item.id==='sch1')`), true);
+  assert.equal(window.eval(`db.attendance.some(item=>item.id==='att2')`), false);
+  assert.equal(window.eval(`db.assignments.find(item=>item.id==='asg2').sessionId`), '');
+  dom.window.close();
+});
+
+test('lịch đã khóa học phí không được chọn để xóa hàng loạt', async () => {
+  const { dom, window } = await createApp();
+  seed(window);
+  window.eval(`renderSchedule(); toggleAllItems('schedules',true)`);
+  const checkbox = window.document.querySelector('.bulk-check[data-type="schedules"]');
+  assert.equal(checkbox.disabled, true);
+  assert.equal(checkbox.checked, false);
+  assert.equal(window.document.querySelector('#deleteSelectedSchedules').disabled, true);
+  assert.match(window.document.querySelector('#scheduleTable').textContent, /Đã khóa học phí/);
   dom.window.close();
 });
 
