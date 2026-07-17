@@ -288,6 +288,37 @@ test('lưu cục bộ đánh dấu bền trạng thái chưa đồng bộ', asyn
   dom.window.close();
 });
 
+test('điện thoại tự tải bản Supabase mới hơn khi mở lại trang', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  const remote = JSON.parse(window.eval('JSON.stringify(db)'));
+  remote.students[0].name = 'BẢO AN MỚI';
+  remote.students[0].full = 'NGUYỄN ĐÌNH BẢO AN MỚI';
+  remote.tuitionNoticeSettings = JSON.parse(window.eval('JSON.stringify(tuitionNoticeDefaults)'));
+  window.__remoteClassroomState = remote;
+  await window.eval(`
+    currentSession={user:{id:'owner-1',email:AUTH_EMAIL}};
+    cloudRowReady=true;
+    cloudRevision=1;
+    cloudLastUpdated='2026-07-17T10:00:00Z';
+    cloudDirty=false;
+    supabaseClient={
+      from(){return{
+        select(fields){return{eq(){return{maybeSingle:async()=>fields==='revision, updated_at'
+          ?{data:{revision:2,updated_at:'2026-07-17T10:01:00Z'},error:null}
+          :{data:{data:window.__remoteClassroomState,revision:2,updated_at:'2026-07-17T10:01:00Z'},error:null}
+        }}}}
+      }}
+    };
+    checkCloudRevision()
+  `);
+  assert.equal(window.eval(`db.students[0].name`), 'BẢO AN MỚI');
+  assert.equal(window.eval(`cloudRevision`), 2);
+  assert.match(window.document.querySelector('#networkStatus').textContent, /Đã đồng bộ/);
+  assert.match(window.document.querySelector('#networkStatus').getAttribute('onclick'), /quickSyncNow/);
+  dom.window.close();
+});
+
 test('lịch tương lai của học sinh đã nghỉ không xuất hiện trên tổng quan', async () => {
   const { dom, window } = await createApp();
   seed(window, { payment: false });
