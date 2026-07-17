@@ -1,8 +1,8 @@
-const CACHE_NAME='duc-classroom-2026.07.17.12';
+const CACHE_NAME='duc-classroom-2026.07.17.13';
 const LOCAL_CORE=[
   './',
   './index.html',
-  './tuition-poster.js?v=2026.07.17.12',
+  './tuition-poster.js?v=2026.07.17.13',
   './student/',
   './student/index.html',
   './student/manifest.webmanifest',

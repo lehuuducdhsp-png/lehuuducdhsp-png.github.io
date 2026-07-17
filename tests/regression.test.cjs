@@ -299,6 +299,58 @@ test('lịch học nhiều tuần có cột STT tự động', async () => {
   dom.window.close();
 });
 
+test('nhập lịch hàng loạt cập nhật môn và giờ của lịch cùng ngày giờ bắt đầu', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval('openBulkScheduleImport()');
+  const form = window.document.querySelector('#modalBody form');
+  assert.equal(form.elements.markAttendance.checked, false);
+  assert.match(form.textContent, /chỉ bật khi nhập lại lịch sử/i);
+  form.elements.student.value = 's1';
+  form.elements.duration.value = '60';
+  form.elements.mode.value = 'Online';
+  form.elements.markAttendance.checked = false;
+  form.elements.rows.value = '06/07/2026 | 15:00 | Vật lý 9\n18/07/2026 | 07:30 | Toán hình 9';
+  window.eval(`submitBulkScheduleImport({preventDefault(){},target:document.querySelector('#modalBody form')})`);
+  const schedules = JSON.parse(window.eval('JSON.stringify(db.schedules)'));
+  const attendance = JSON.parse(window.eval('JSON.stringify(db.attendance)'));
+  assert.equal(schedules.length, 2);
+  assert.equal(schedules.find(item => item.id === 'sch1').subject, 'Vật lý 9');
+  assert.equal(schedules.find(item => item.id === 'sch1').time, '15:00–16:00');
+  assert.equal(schedules.find(item => item.id === 'sch1').mode, 'Online');
+  assert.equal(attendance.find(item => item.id === 'att1').subject, 'Vật lý 9');
+  assert.equal(attendance.find(item => item.id === 'att1').time, '15:00');
+  assert.match(window.document.querySelector('#toast').textContent, /thêm 1, cập nhật 1 lịch/i);
+  dom.window.close();
+});
+
+test('danh sách lịch mới của thầy được đọc đủ 17 dòng qua nhiều tuần', async () => {
+  const { dom, window } = await createApp();
+  const rows = `18/07/2026 | 07:30 | Vật lý 9
+18/07/2026 | 17:30 | Toán hình 9
+19/07/2026 | 13:30 | Hóa học 9
+19/07/2026 | 15:00 | Toán số 9
+20/07/2026 | 09:00 | Sinh học 9
+21/07/2026 | 09:00 | Vật lý 9
+21/07/2026 | 19:30 | Toán hình 9
+23/07/2026 | 09:00 | Hóa học 9
+24/07/2026 | 19:00 | Toán số 9
+25/07/2026 | 19:00 | Sinh học 9
+26/07/2026 | 09:00 | Toán hình 9
+27/07/2026 | 09:00 | Vật lý 9
+28/07/2026 | 09:00 | Toán số 9
+30/07/2026 | 09:00 | Hóa học 9
+31/07/2026 | 19:00 | Toán hình 9
+01/08/2026 | 19:00 | Sinh học 9
+02/08/2026 | 09:00 | Toán số 9`;
+  const parsed = JSON.parse(window.eval(`JSON.stringify(parseBulkScheduleRows(${JSON.stringify(rows)},90))`));
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.rows.length, 17);
+  assert.deepEqual(parsed.rows[0], { date: '2026-07-18', start: '07:30', end: '09:00', subject: 'Vật lý 9' });
+  assert.deepEqual(parsed.rows.at(-1), { date: '2026-08-02', start: '09:00', end: '10:30', subject: 'Toán số 9' });
+  dom.window.close();
+});
+
 test('bảng điểm có chú thích rõ mức đạt và chưa đạt', async () => {
   const { dom, window } = await createApp();
   window.eval('openScoreGuide()');
