@@ -399,7 +399,7 @@ test('giáo viên xem như học sinh mà không cần hoặc thay đổi mật 
   const student = fs.readFileSync(studentSourcePath, 'utf8');
   const edge = fs.readFileSync(edgeFunctionPath, 'utf8');
   assert.match(teacher, /Xem như học sinh/);
-  assert.match(teacher, /action:'preview_student'/);
+  assert.match(teacher, /studentPreviewDashboard/);
   assert.match(teacher, /preview-key/);
   assert.match(teacher, /ducTeacherPreview:/);
   assert.match(student, /TEACHER_PREVIEW/);
@@ -409,6 +409,23 @@ test('giáo viên xem như học sinh mà không cần hoặc thay đổi mật 
   assert.match(edge, /action === 'preview_student'/);
   assert.match(edge, /teacher_preview_student/);
   assert.doesNotMatch(edge.match(/if \(action === 'preview_student'\)[\s\S]*?\n  }/)?.[0] || '', /updateUserById|password/);
+});
+
+test('xem như học sinh dùng dữ liệu đã lọc tại máy và không phụ thuộc Edge Function', async () => {
+  const { dom, window } = await createApp();
+  seed(window);
+  const sent = [];
+  const popup = { closed: false, postMessage(payload) { sent.push(payload); }, close() {} };
+  window.open = () => popup;
+  window.eval(`studentAccounts=[{studentId:'s1',username:'bao.an',status:'active'}]; openStudentPortalPreview('s1')`);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].dashboard.profile.id, 's1');
+  assert.equal(sent[0].account.username, 'bao.an');
+  assert.equal(sent[0].dashboard.attendance.length, 1);
+  assert.equal('unitFee' in sent[0].dashboard.attendance[0], false);
+  assert.equal('paymentTransactions' in sent[0].dashboard, false);
+  assert.equal('payments' in sent[0].dashboard, false);
+  dom.window.close();
 });
 
 test('cổng học sinh trên điện thoại hiện đủ ngày tháng năm hiện tại', () => {
