@@ -6,8 +6,8 @@ const { JSDOM } = require('jsdom');
 
 const sourcePath = path.join(__dirname, '..', 'index.html');
 const studentSourcePath = path.join(__dirname, '..', 'student', 'index.html');
-const edgeFunctionPath = path.join(__dirname, '..', '..', 'supabase', 'functions', 'student-portal', 'index.ts');
-const studentSqlPath = path.join(__dirname, '..', '..', 'supabase', 'student_portal.sql');
+const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'student-portal', 'index.ts');
+const studentSqlPath = path.join(__dirname, '..', 'supabase', 'student_portal.sql');
 const html = fs.readFileSync(sourcePath, 'utf8')
   .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
 
