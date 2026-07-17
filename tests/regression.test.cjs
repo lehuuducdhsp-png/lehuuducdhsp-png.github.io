@@ -134,7 +134,7 @@ test('cổng học sinh ghép đúng điểm danh cũ chưa có scheduleId', asy
   const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
     .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
   const dom = new JSDOM(studentHtml, {
-    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1',
+    url: 'https://lehuuducdhsp-png.github.io/student/?test=1',
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     beforeParse(window) {
@@ -151,6 +151,34 @@ test('cổng học sinh ghép đúng điểm danh cũ chưa có scheduleId', asy
   const rowText = dom.window.document.querySelector('#scheduleRows').textContent;
   assert.match(rowText, /Có mặt/);
   assert.doesNotMatch(rowText, /Chưa điểm danh|Chưa ghi/);
+  dom.window.close();
+});
+
+test('cổng học sinh có thời khóa biểu riêng nằm giữa Tổng quan và Lịch học', () => {
+  const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
+    .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
+  const dom = new JSDOM(studentHtml, {
+    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1',
+    runScripts: 'dangerously',
+    pretendToBeVisual: true,
+    beforeParse(window) {
+      window.scrollTo = () => {};
+      window.open = () => null;
+    }
+  });
+  dom.window.eval(`studentTimetableWeek='2026-07-13'; studentTimetableDay=2; data={
+    profile:{id:'s1',name:'BẢO AN',full:'BẢO AN',grade:9,subjects:'KHTN'},
+    schedules:[{id:'sch1',date:'2026-07-13',weekStart:'2026-07-13',day:2,time:'17:30–19:00',subject:'Hóa học 9',mode:'Trực tiếp'}],
+    attendance:[],scores:[],assignments:[]
+  }; account={username:'bao.an'}; renderAll(); showTab('timetable');`);
+  const firstTabs = [...dom.window.document.querySelectorAll('#tabs [data-tab]')]
+    .slice(0, 3)
+    .map(item => item.textContent.trim());
+  assert.deepEqual(firstTabs, ['Tổng quan', 'Thời khóa biểu', 'Lịch học']);
+  assert.equal(dom.window.document.querySelector('#view-timetable').classList.contains('active'), true);
+  assert.match(dom.window.document.querySelector('#studentTimetableBody').textContent, /Hóa học 9/);
+  assert.match(dom.window.document.querySelector('#studentTimetableWeek').textContent, /13\/0?7\/2026/);
+  assert.match(dom.window.document.querySelector('#studentTimetableSummary').textContent, /1.*Buổi học trong tuần/s);
   dom.window.close();
 });
 

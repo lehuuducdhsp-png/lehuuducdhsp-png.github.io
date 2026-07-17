@@ -196,7 +196,7 @@
     const SUPABASE_PUBLISHABLE_KEY='sb_publishable_u05uKoArlUZn_OMtS5aVgA__W3np9Hb';
     const AUTH_USERNAME='lehuuducdhsp';
     const AUTH_EMAIL='lehuuducdhsp@gmail.com';
-    const APP_VERSION='2026.07.17.2';
+    const APP_VERSION='2026.07.17.3';
     const DEVICE_ID=localStorage.getItem('ducDeviceId')||`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
     localStorage.setItem('ducDeviceId',DEVICE_ID);
     let supabaseClient=null,currentSession=null,cloudRowReady=localStorage.getItem('ducCloudReady')==='1',cloudSaveTimer=null,cloudDirty=localStorage.getItem('ducCloudPending')==='1',cloudSaving=false,cloudLastUpdated='',cloudLoadedUser='';
