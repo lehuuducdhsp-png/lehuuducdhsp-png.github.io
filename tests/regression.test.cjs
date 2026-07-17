@@ -400,9 +400,54 @@ test('giáo viên xem như học sinh mà không cần hoặc thay đổi mật 
   const edge = fs.readFileSync(edgeFunctionPath, 'utf8');
   assert.match(teacher, /Xem như học sinh/);
   assert.match(teacher, /action:'preview_student'/);
+  assert.match(teacher, /preview-key/);
+  assert.match(teacher, /ducTeacherPreview:/);
   assert.match(student, /TEACHER_PREVIEW/);
   assert.match(student, /duc-teacher-preview-data/);
+  assert.match(student, /readStoredTeacherPreview/);
+  assert.match(student, /ducTeacherPreview:/);
   assert.match(edge, /action === 'preview_student'/);
   assert.match(edge, /teacher_preview_student/);
   assert.doesNotMatch(edge.match(/if \(action === 'preview_student'\)[\s\S]*?\n  }/)?.[0] || '', /updateUserById|password/);
+});
+
+test('cổng học sinh trên điện thoại hiện đủ ngày tháng năm hiện tại', () => {
+  const student = fs.readFileSync(studentSourcePath, 'utf8');
+  const mobileBlock = student.match(/@media\(max-width:850px\)\{[\s\S]*?\n    @media\(max-width:520px\)/)?.[0] || '';
+  assert.match(mobileBlock, /\.hero-mark\{display:block/);
+  assert.doesNotMatch(mobileBlock, /\.hero-mark\{display:none/);
+  assert.match(student, /month:'long',year:'numeric'/);
+  assert.match(student, /id="heroDay"/);
+  assert.match(student, /id="heroMonth"/);
+});
+
+test('xem như học sinh nhận dữ liệu dự phòng khi điện thoại cắt window.opener', async () => {
+  const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
+    .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
+  const payload = {
+    createdAt: Date.now(),
+    sameTab: true,
+    account: { username: 'bao.an' },
+    dashboard: {
+      profile: { id: 's1', name: 'BẢO AN', full: 'NGUYỄN ĐÌNH BẢO AN', grade: 9, subjects: 'KHTN' },
+      schedules: [], attendance: [], scores: [], assignments: []
+    }
+  };
+  const dom = new JSDOM(studentHtml, {
+    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1&preview-key=mobile-test',
+    runScripts: 'dangerously',
+    pretendToBeVisual: true,
+    beforeParse(window) {
+      window.scrollTo = () => {};
+      window.localStorage.setItem('ducTeacherPreview:mobile-test', JSON.stringify(payload));
+      Object.defineProperty(window, 'opener', { value: null });
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(dom.window.document.querySelector('#studentApp').classList.contains('hidden'), false);
+  assert.match(dom.window.document.querySelector('#previewBanner').textContent, /GIÁO VIÊN XEM NHƯ HỌC SINH/);
+  assert.equal(dom.window.document.querySelector('#logoutButton').textContent, 'Quay lại quản trị');
+  assert.match(dom.window.document.querySelector('#studentGreeting').textContent, /BẢO AN/);
+  assert.equal(dom.window.localStorage.getItem('ducTeacherPreview:mobile-test'), null);
+  dom.window.close();
 });
