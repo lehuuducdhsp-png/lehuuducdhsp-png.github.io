@@ -350,6 +350,7 @@ test('cổng học sinh có thời khóa biểu riêng nằm giữa Tổng quan 
   assert.deepEqual(firstTabs, ['Tổng quan', 'Thời khóa biểu', 'Lịch học']);
   assert.equal(dom.window.document.querySelector('#view-timetable').classList.contains('active'), true);
   assert.match(dom.window.document.querySelector('#studentTimetableBody').textContent, /Hóa học 9/);
+  assert.match(dom.window.document.querySelector('#studentMobileList').textContent, /Hóa học 9/);
   assert.match(dom.window.document.querySelector('#studentTimetableWeek').textContent, /13\/0?7\/2026/);
   assert.match(dom.window.document.querySelector('#studentTimetableSummary').textContent, /1.*Buổi học trong tuần/s);
   dom.window.close();
@@ -373,6 +374,22 @@ test('điện thoại có thêm bảng thời khóa biểu tuần cho cả giáo
   assert.ok(window.document.querySelector('#timetableBody .lesson-trash'));
   assert.ok(window.document.querySelector('#timetableBody .lesson-attendance'));
   assert.ok(window.document.querySelector('#timetableBody .empty-slot'));
+  dom.window.close();
+});
+
+test('máy tính có xem nhanh thời khóa biểu theo từng ngày cho giáo viên và học sinh', async () => {
+  const teacherSource = fs.readFileSync(sourcePath, 'utf8');
+  const studentSource = fs.readFileSync(studentSourcePath, 'utf8');
+  assert.match(teacherSource, /\.mobile-timetable\{display:block/);
+  assert.match(studentSource, /\.student-mobile-timetable\{display:block/);
+  assert.match(teacherSource, /Xem nhanh theo từng ngày/);
+  assert.match(studentSource, /Xem nhanh theo từng ngày/);
+
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`mobileTimetableDay=2; document.getElementById('timetableStudent').value='s1'; renderTimetable()`);
+  assert.match(window.document.querySelector('#mobileTimetableList').textContent, /BẢO AN/);
+  assert.match(window.document.querySelector('#mobileTimetableList').textContent, /Hóa học 9/);
   dom.window.close();
 });
 
