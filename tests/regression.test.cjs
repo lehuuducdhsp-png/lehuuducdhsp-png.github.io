@@ -229,12 +229,20 @@ test('lịch sử khoản thu lọc theo học sinh và hiện tổng LS thu lư
 test('phiếu học phí mặc định xanh lá pastel và tên dài nằm trong vùng riêng', async () => {
   const { dom, window } = await createApp();
   seed(window);
-  window.eval(`db.students[0].full='NGUYỄN THỊ NGỌC TRÂM'`);
+  window.eval(`
+    db.students[0].full='NGUYỄN THỊ NGỌC TRÂM';
+    db.tuitionNoticeSettings={phone:'0362975219',accountNumber:'0362975219',bankName:'VP Bank',transferTemplate:'{Học sinh} – {số buổi} buổi',theme:'pink',themeVersion:'pastel-green-v1'};
+    normalizeBillingData();
+  `);
   window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
   window.eval(`openTuitionNotice('s1','p1')`);
   const form = window.document.querySelector('#tuitionNoticeForm');
   const svg = window.document.querySelector('#tuitionPosterPreview').innerHTML;
+  assert.equal(window.eval(`db.tuitionNoticeSettings.theme`), 'green');
+  assert.equal(window.eval(`db.tuitionNoticeSettings.themeVersion`), 'pastel-green-locked-v1');
   assert.equal(form.elements.theme.value, 'green');
+  assert.equal(form.querySelector('input[readonly][value*="Xanh lá pastel"]').value, 'Xanh lá pastel • Cố định');
+  assert.doesNotMatch(form.textContent, /Xanh dương|Hồng/);
   assert.match(svg, /#4f9b76/);
   assert.match(svg, /NGUYỄN THỊ NGỌC TRÂM/);
   assert.match(svg, /x1="560"/);

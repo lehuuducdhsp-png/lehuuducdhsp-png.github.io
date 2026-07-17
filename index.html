@@ -197,7 +197,7 @@
     const SUPABASE_PUBLISHABLE_KEY='sb_publishable_u05uKoArlUZn_OMtS5aVgA__W3np9Hb';
     const AUTH_USERNAME='lehuuducdhsp';
     const AUTH_EMAIL='lehuuducdhsp@gmail.com';
-    const APP_VERSION='2026.07.17.15';
+    const APP_VERSION='2026.07.17.16';
     const DEVICE_ID=localStorage.getItem('ducDeviceId')||`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
     localStorage.setItem('ducDeviceId',DEVICE_ID);
     let supabaseClient=null,currentSession=null,cloudRowReady=localStorage.getItem('ducCloudReady')==='1',cloudSaveTimer=null,cloudDirty=localStorage.getItem('ducCloudPending')==='1',cloudSaving=false,cloudLastUpdated='',cloudLoadedUser='';
@@ -232,7 +232,7 @@
     const addDaysISO=(value,days)=>{const d=dateObj(value);d.setDate(d.getDate()+days);return isoLocal(d)};
     const dayCode=value=>{const d=dateObj(value).getDay();return d===0?8:d+1};
     const dateForDay=(weekStart,day)=>addDaysISO(weekStart,day===8?6:day-2);
-    const tuitionNoticeDefaults={phone:'0362975219',accountNumber:'0362975219',bankName:'VP Bank',transferTemplate:'{Học sinh} – Lớp học Thầy Đức – {số buổi} buổi',theme:'green',themeVersion:'pastel-green-v1'};
+    const tuitionNoticeDefaults={phone:'0362975219',accountNumber:'0362975219',bankName:'VP Bank',transferTemplate:'{Học sinh} – Lớp học Thầy Đức – {số buổi} buổi',theme:'green',themeVersion:'pastel-green-locked-v1'};
     const initial={students:[],schedules:[],attendance:[],scores:[],assignments:[],payments:{},paymentTransactions:[],documents:[],tuitionNoticeSettings:structuredClone(tuitionNoticeDefaults)};
     function readLocalClassroomData(){try{const raw=localStorage.getItem('ducClassroomV1');return raw?JSON.parse(raw):structuredClone(initial)}catch(error){console.error('Dữ liệu cục bộ bị lỗi định dạng:',error);localStorage.setItem('ducCorruptDataDetectedAt',new Date().toISOString());return structuredClone(initial)}}
     let db=readLocalClassroomData();
@@ -634,6 +634,6 @@
     window.addEventListener('offline',updateNetworkStatus);
     window.setInterval(()=>{if(document.getElementById('classroomApp').style.display==='block'){setDates();renderDashboard();refreshCloudWhenActive();enforceIdleSession()}},60000);
   </script>
-  <script src="./tuition-poster.js?v=2026.07.17.15"></script>
+  <script src="./tuition-poster.js?v=2026.07.17.16"></script>
 </body>
 </html>
