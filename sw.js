@@ -1,9 +1,10 @@
-const CACHE_NAME='duc-classroom-2026.07.18.2';
+const CACHE_NAME='duc-classroom-2026.07.18.3';
 const LOCAL_CORE=[
   './',
   './index.html',
   './student/',
   './student/index.html',
+  './tuition-poster.js',
   './student/manifest.webmanifest',
   './manifest.webmanifest',
   './assets/logo-duc.jpg',
