@@ -95,8 +95,8 @@ test('lịch học nhiều tuần có cột STT tự động', async () => {
   seed(window, { payment: false });
   window.eval('renderSchedule()');
   const headers = [...window.document.querySelectorAll('#schedule thead th')].map(item => item.textContent.trim());
-  const firstCell = window.document.querySelector('#scheduleTable tr td');
-  assert.equal(headers[0], 'STT');
+  const firstCell = window.document.querySelector('#scheduleTable tr td:nth-child(2)');
+  assert.equal(headers[1], 'STT');
   assert.equal(firstCell.textContent.trim(), '1');
   dom.window.close();
 });
@@ -242,4 +242,21 @@ test('đồng bộ nhiều trình duyệt có Realtime và cơ chế kiểm tra 
   assert.match(source, /startCloudRealtime\(\)/);
   assert.match(source, /loadCloudState\(\{force:true\}\)/);
   assert.match(source, /},20000\);/);
+});
+
+test('lịch học lọc theo học sinh và xóa hàng loạt đúng các dòng đang hiển thị', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  addSecondStudent(window);
+  assert.equal(window.document.querySelectorAll('#scheduleStudentFilterSelect option').length, 3);
+  window.eval("setScheduleStudentFilter('s2')");
+  const tableText = window.document.querySelector('#scheduleTable').textContent;
+  assert.match(tableText, /NGỌC TRÂM/);
+  assert.doesNotMatch(tableText, /BẢO AN/);
+  window.eval("toggleAllItems('schedules',true); deleteSelectedItems('schedules')");
+  assert.equal(window.eval("db.schedules.some(item=>item.id==='sch2')"), false);
+  assert.equal(window.eval("db.attendance.some(item=>item.id==='att2')"), false);
+  assert.equal(window.eval("db.schedules.some(item=>item.id==='sch1')"), true);
+  assert.equal(window.eval("db.attendance.some(item=>item.id==='att1')"), true);
+  dom.window.close();
 });
