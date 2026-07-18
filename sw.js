@@ -1,4 +1,4 @@
-const CACHE_NAME='duc-classroom-2026.07.18.4';
+const CACHE_NAME='duc-classroom-2026.07.18.5';
 const LOCAL_CORE=[
   './',
   './index.html',
@@ -63,14 +63,16 @@ self.addEventListener('fetch',event=>{
 
   event.respondWith((async()=>{
     const cached=await caches.match(request);
-    const network=fetch(request).then(async response=>{
+    try{
+      const response=await fetch(request,{cache:'no-store'});
       if(response.ok||response.type==='opaque'){
         const cache=await caches.open(CACHE_NAME);
         await cache.put(request,response.clone());
       }
       return response;
-    });
-    if(cached)return cached;
-    return network;
+    }catch(error){
+      if(cached)return cached;
+      throw error;
+    }
   })());
 });
