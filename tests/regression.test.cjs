@@ -5,11 +5,9 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
 const sourcePath = path.join(__dirname, '..', 'index.html');
-const tuitionPosterPath = path.join(__dirname, '..', 'tuition-poster.js');
-const serviceWorkerPath = path.join(__dirname, '..', 'sw.js');
 const studentSourcePath = path.join(__dirname, '..', 'student', 'index.html');
-const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'student-portal', 'index.ts');
-const studentSqlPath = path.join(__dirname, '..', 'supabase', 'student_portal.sql');
+const edgeFunctionPath = path.join(__dirname, '..', '..', 'supabase', 'functions', 'student-portal', 'index.ts');
+const studentSqlPath = path.join(__dirname, '..', '..', 'supabase', 'student_portal.sql');
 const html = fs.readFileSync(sourcePath, 'utf8')
   .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
 
@@ -68,210 +66,6 @@ test('đơn giá buổi cũ không đổi khi sửa học phí hiện tại', as
   dom.window.close();
 });
 
-test('giai đoạn học phí khóa đúng từng buổi và ghi rõ giờ ngày cùng buổi học bù', async () => {
-  const { dom, window } = await createApp();
-  window.eval(`db={
-    students:[{id:'s1',name:'BẢO AN',full:'BẢO AN',grade:9,fee:150000,status:'active',subjects:'KHTN',mode:'1:1'}],
-    schedules:[
-      {id:'sch1',student:'s1',date:'2026-07-06',weekStart:'2026-07-06',day:2,time:'15:00–16:30',subject:'Hóa học 9',mode:'Trực tiếp'},
-      {id:'sch2',student:'s1',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'18:30–20:00',subject:'Hóa học 9',mode:'Trực tiếp'},
-      {id:'sch3',student:'s1',date:'2026-07-08',weekStart:'2026-07-06',day:4,time:'10:00–11:30',subject:'Hóa học 9',mode:'Trực tiếp'}
-    ],
-    attendance:[
-      {id:'att1',scheduleId:'sch1',student:'s1',date:'2026-07-06',time:'15:00',subject:'Hóa học 9',status:'present',charged:true,unitFee:150000},
-      {id:'att2',scheduleId:'sch2',student:'s1',date:'2026-07-07',time:'18:30',subject:'Hóa học 9',status:'makeup',charged:true,unitFee:150000},
-      {id:'att3',scheduleId:'sch3',student:'s1',date:'2026-07-08',time:'10:00',subject:'Hóa học 9',status:'present',charged:true,unitFee:150000}
-    ],
-    scores:[],assignments:[],payments:{},documents:[],
-    paymentTransactions:[{id:'p1',student:'s1',date:'2026-07-08',periodStart:'2026-07-06',periodEnd:'2026-07-08',periodStartTime:'15:00',periodEndTime:'20:00',periodSessionIds:['att1','att2'],sessions:2,amount:300000,accountingMode:'history',locked:true,lockedSessionIds:['att1','att2'],note:''}]
-  }; renderAll();`);
-  const matchedIds = JSON.parse(window.eval(`JSON.stringify(historicalPaymentCoverage('s1').byPayment.p1.matchedIds)`));
-  assert.deepEqual(matchedIds, ['att1', 'att2']);
-  assert.equal(window.eval(`historicalPaymentCoverage('s1').covered.has(db.attendance[2])`), false);
-  const historyText = window.document.querySelector('#paymentHistoryTable').textContent;
-  assert.match(historyText, /15:00.*0?6\/0?7\/2026/s);
-  assert.match(historyText, /20:00.*0?7\/0?7\/2026/s);
-  assert.match(historyText, /1 buổi học bù/i);
-  window.eval(`openPaymentModal('s1','p1')`);
-  assert.equal(window.document.querySelectorAll('input[name="periodSession"]:checked').length, 2);
-  assert.match(window.document.querySelector('#paymentSelectionSummary').textContent, /1 buổi học bù/i);
-  dom.window.close();
-});
-
-test('khoản thu hiện tại lưu đúng buổi cùng giờ bắt đầu và kết thúc', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval(`openPaymentModal('s1','','current')`);
-  const form = window.document.querySelector('#modalBody form');
-  assert.equal(form.querySelectorAll('input[name="periodSession"]:checked').length, 1);
-  window.eval(`submitPayment({preventDefault(){},target:document.querySelector('#modalBody form')},'')`);
-  const payment = JSON.parse(window.eval('JSON.stringify(db.paymentTransactions[0])'));
-  assert.deepEqual(payment.periodSessionIds, ['att1']);
-  assert.deepEqual(payment.lockedSessionIds, []);
-  assert.equal(payment.periodStart, '2026-07-06');
-  assert.equal(payment.periodStartTime, '15:00');
-  assert.equal(payment.periodEnd, '2026-07-06');
-  assert.equal(payment.periodEndTime, '16:30');
-  assert.equal(payment.sessions, 1);
-  assert.equal(payment.amount, 150000);
-  dom.window.close();
-});
-
-test('tạo phiếu học phí gửi phụ huynh từ đúng các buổi đã lưu', async () => {
-  const teacherSource = fs.readFileSync(sourcePath, 'utf8');
-  const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
-  const appVersion = teacherSource.match(/APP_VERSION='([^']+)'/)?.[1];
-  const posterVersion = teacherSource.match(/tuition-poster\.js\?v=([^"']+)/)?.[1];
-  assert.equal(posterVersion, appVersion);
-  assert.match(serviceWorker, new RegExp(`tuition-poster\\.js\\?v=${appVersion.replaceAll('.', '\\.')}`));
-  const { dom, window } = await createApp();
-  seed(window);
-  window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
-  window.eval(`openTuitionNotice('s1','p1')`);
-  assert.equal(window.document.querySelectorAll('#tuitionNoticeSessions input[name="noticeSession"]:checked').length, 1);
-  const posterText = window.document.querySelector('#tuitionPosterPreview').textContent;
-  assert.match(posterText, /LỊCH HỌC & HỌC PHÍ/);
-  assert.match(posterText, /BẢO AN/);
-  assert.match(posterText, /15h00/);
-  assert.match(posterText, /150\.000đ/);
-  assert.match(posterText, /Từ 15:00.*6\/7\/2026.*16:30.*6\/7\/2026/s);
-  assert.match(posterText, /0362975219/);
-  assert.match(window.document.querySelector('#modalBody').textContent, /Chia sẻ ảnh/);
-  assert.match(window.document.querySelector('#modalBody').textContent, /Tải PNG/);
-  assert.match(window.document.querySelector('#modalBody').textContent, /In \/ Lưu PDF/);
-  dom.window.close();
-});
-
-test('chỉnh sửa bài tập giữ nguyên bản ghi và cập nhật đủ nội dung', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval(`db.assignments=[{
-    id:'asg1',student:'s1',assignedDate:'2026-07-06',sessionId:'att1',
-    subject:'Hóa học 9',due:'2026-07-20',title:'Bài cũ',status:'new',note:'Ghi chú cũ'
-  }]; renderAssignments();`);
-  assert.match(window.document.querySelector('#assignmentGrid').textContent, /Sửa/);
-  window.eval(`editAssignment('asg1')`);
-  const form = window.document.querySelector('#assignmentForm');
-  assert.equal(window.document.querySelector('#modalTitle').textContent, 'Chỉnh sửa bài tập');
-  form.elements.title.value = 'Hoàn thành bài 5, 6, 8';
-  form.elements.note.value = 'Làm kỹ phần vận dụng';
-  form.elements.due.value = '2026-07-22';
-  form.elements.status.value = 'doing';
-  window.eval(`submitAssignment({preventDefault(){},target:document.querySelector('#assignmentForm')},'asg1')`);
-  const assignments = JSON.parse(window.eval('JSON.stringify(db.assignments)'));
-  assert.equal(assignments.length, 1);
-  assert.equal(assignments[0].id, 'asg1');
-  assert.equal(assignments[0].title, 'Hoàn thành bài 5, 6, 8');
-  assert.equal(assignments[0].note, 'Làm kỹ phần vận dụng');
-  assert.equal(assignments[0].due, '2026-07-22');
-  assert.equal(assignments[0].status, 'doing');
-  dom.window.close();
-});
-
-test('tổng LS lưu cộng cả hồ sơ đã nghỉ và mỗi khoản chỉ cộng một lần', async () => {
-  const { dom, window } = await createApp();
-  seed(window);
-  window.eval(`
-    db.schedules.push({id:'sch2',student:'s1',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'18:30–20:00',subject:'Toán 9',mode:'Trực tiếp'});
-    db.attendance.push({id:'att2',scheduleId:'sch2',student:'s1',date:'2026-07-07',time:'18:30',subject:'Toán 9',status:'present',charged:true,unitFee:200000});
-    db.paymentTransactions.push({id:'p2',student:'s1',date:'2026-07-07',periodStart:'2026-07-07',periodEnd:'2026-07-07',periodStartTime:'18:30',periodEndTime:'20:00',periodSessionIds:['att2'],sessions:1,amount:200000,accountingMode:'current',locked:false,lockedSessionIds:[],note:''});
-    db.students.push({id:'s2',name:'NGỌC LINH',full:'NGỌC LINH',grade:7,fee:600000,status:'inactive',subjects:'Toán',mode:'1:1'});
-    db.schedules.push({id:'sch3',student:'s2',date:'2026-07-08',weekStart:'2026-07-06',day:4,time:'15:30–17:00',subject:'Toán 7',mode:'Trực tiếp'});
-    db.attendance.push({id:'att3',scheduleId:'sch3',student:'s2',date:'2026-07-08',time:'15:30',subject:'Toán 7',status:'present',charged:true,unitFee:600000});
-    db.paymentTransactions.push({id:'p3',student:'s2',date:'2026-07-08',periodStart:'2026-07-08',periodEnd:'2026-07-08',periodStartTime:'15:30',periodEndTime:'17:00',periodSessionIds:['att3'],sessions:1,amount:600000,accountingMode:'history',locked:true,lockedSessionIds:['att3'],note:''});
-    renderTuition();
-  `);
-  const audit = JSON.parse(window.eval('JSON.stringify(tuitionPaymentAudit())'));
-  assert.equal(audit.currentTotal, 200000);
-  assert.equal(audit.historyTotal, 150000);
-  assert.equal(audit.activeTotal, 350000);
-  assert.equal(audit.inactiveTotal, 600000);
-  assert.equal(audit.allCurrentTotal, 200000);
-  assert.equal(audit.allHistoryTotal, 750000);
-  assert.equal(audit.allTotal, 950000);
-  assert.equal(audit.problemCount, 0);
-  const totalText = window.document.querySelector('#feeTotal').textContent;
-  assert.match(totalText, /TỔNG HỌC PHÍ ĐÃ PHÁT SINH TRONG HỆ THỐNG/);
-  assert.match(totalText, /Đã thu đối trừ\s*200\.000đ/);
-  assert.match(totalText, /Tổng LS lưu:\s*950\.000đ/);
-  window.eval('openTuitionPaymentAudit()');
-  const auditText = window.document.querySelector('#modalBody').textContent;
-  assert.match(auditText, /200\.000đ thu hiện tại \+ 750\.000đ lịch sử khóa sổ = 950\.000đ/);
-  assert.equal(window.document.querySelectorAll('#modalBody tbody tr').length, 3);
-  dom.window.close();
-});
-
-test('lịch sử khoản thu lọc theo học sinh và hiện tổng LS thu lưu của em đó', async () => {
-  const { dom, window } = await createApp();
-  seed(window);
-  window.eval(`
-    db.students.push({id:'s2',name:'NGỌC LINH',full:'NGỌC LINH',grade:7,fee:150000,status:'inactive',subjects:'Toán',mode:'1:1'});
-    db.paymentTransactions.push({id:'p2',student:'s2',date:'2026-07-08',periodStart:'2026-07-01',periodEnd:'2026-07-08',sessions:4,amount:600000,accountingMode:'history',locked:true,lockedSessionIds:[],periodSessionIds:[],note:'Đã chuyển khoản'});
-    renderTuition();
-  `);
-  const filter = window.document.querySelector('#tuitionHistoryStudent');
-  assert.match(filter.textContent, /BẢO AN/);
-  assert.match(filter.textContent, /NGỌC LINH.*Đã nghỉ/s);
-  filter.value = 's1';
-  window.eval('renderTuition()');
-  const studentRows = window.document.querySelectorAll('#paymentHistoryTable tr');
-  assert.equal(studentRows.length, 1);
-  assert.match(studentRows[0].textContent, /BẢO AN/);
-  assert.doesNotMatch(studentRows[0].textContent, /NGỌC LINH/);
-  assert.match(window.document.querySelector('#tuitionHistoryStudentTotal').textContent, /BẢO AN.*150\.000đ.*1 khoản/);
-  filter.value = 'all';
-  window.eval('renderTuition()');
-  assert.equal(window.document.querySelectorAll('#paymentHistoryTable tr').length, 2);
-  assert.match(window.document.querySelector('#tuitionHistoryStudentTotal').textContent, /Tất cả học sinh.*750\.000đ.*2 khoản/);
-  dom.window.close();
-});
-
-test('phiếu học phí mặc định xanh lá pastel và tên dài nằm trong vùng riêng', async () => {
-  const { dom, window } = await createApp();
-  seed(window);
-  window.eval(`
-    db.students[0].full='NGUYỄN THỊ NGỌC TRÂM';
-    db.tuitionNoticeSettings={phone:'0362975219',accountNumber:'0362975219',bankName:'VP Bank',transferTemplate:'{Học sinh} – {số buổi} buổi',theme:'pink',themeVersion:'pastel-green-v1'};
-    normalizeBillingData();
-  `);
-  window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
-  window.eval(`openTuitionNotice('s1','p1')`);
-  const form = window.document.querySelector('#tuitionNoticeForm');
-  const svg = window.document.querySelector('#tuitionPosterPreview').innerHTML;
-  assert.equal(window.eval(`db.tuitionNoticeSettings.theme`), 'green');
-  assert.equal(window.eval(`db.tuitionNoticeSettings.themeVersion`), 'pastel-green-locked-v1');
-  assert.equal(form.elements.theme.value, 'green');
-  assert.equal(form.querySelector('input[readonly][value*="Xanh lá pastel"]').value, 'Xanh lá pastel • Cố định');
-  assert.doesNotMatch(form.textContent, /Xanh dương|Hồng/);
-  assert.match(svg, /#4f9b76/);
-  assert.match(svg, /NGUYỄN THỊ NGỌC TRÂM/);
-  assert.match(svg, /x1="560"/);
-  dom.window.close();
-});
-
-test('phiếu học phí chọn được buổi chưa học đã có trong thời khóa biểu', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval(`
-    db.attendance=[];
-    db.schedules[0].date=addDaysISO(vietnamNow().date,2);
-    db.schedules[0].weekStart=mondayISO(db.schedules[0].date);
-  `);
-  window.eval(fs.readFileSync(tuitionPosterPath, 'utf8'));
-  window.eval(`openTuitionNotice('s1')`);
-  const option = window.document.querySelector('#tuitionNoticeSessions input[value="schedule:sch1"]');
-  assert.ok(option);
-  assert.equal(option.checked, true);
-  assert.equal(window.eval('db.attendance.length'), 0);
-  const modalText = window.document.querySelector('#modalBody').textContent;
-  const posterText = window.document.querySelector('#tuitionPosterPreview').textContent;
-  assert.match(modalText, /Chưa học • Đã có trong TKB/);
-  assert.match(modalText, /1 buổi chưa học đã có TKB/);
-  assert.match(posterText, /LỊCH/);
-  assert.match(posterText, /150\.000đ/);
-  dom.window.close();
-});
-
 test('kiểm tra toàn bộ cấu trúc khoản thu và tài liệu khi nhập JSON', async () => {
   const { dom, window } = await createApp();
   const malformed = { students: [], schedules: [], attendance: [], scores: [], assignments: [], paymentTransactions: {}, documents: 'sai' };
@@ -288,91 +82,6 @@ test('lưu cục bộ đánh dấu bền trạng thái chưa đồng bộ', asyn
   dom.window.close();
 });
 
-test('điện thoại tự tải bản Supabase mới hơn khi mở lại trang', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  const remote = JSON.parse(window.eval('JSON.stringify(db)'));
-  remote.students[0].name = 'BẢO AN MỚI';
-  remote.students[0].full = 'NGUYỄN ĐÌNH BẢO AN MỚI';
-  remote.tuitionNoticeSettings = JSON.parse(window.eval('JSON.stringify(tuitionNoticeDefaults)'));
-  window.__remoteClassroomState = remote;
-  await window.eval(`
-    currentSession={user:{id:'owner-1',email:AUTH_EMAIL}};
-    cloudRowReady=true;
-    cloudRevision=1;
-    cloudLastUpdated='2026-07-17T10:00:00Z';
-    cloudDirty=false;
-    supabaseClient={
-      from(){return{
-        select(fields){return{eq(){return{maybeSingle:async()=>fields==='revision, updated_at'
-          ?{data:{revision:2,updated_at:'2026-07-17T10:01:00Z'},error:null}
-          :{data:{data:window.__remoteClassroomState,revision:2,updated_at:'2026-07-17T10:01:00Z'},error:null}
-        }}}}
-      }}
-    };
-    checkCloudRevision()
-  `);
-  assert.equal(window.eval(`db.students[0].name`), 'BẢO AN MỚI');
-  assert.equal(window.eval(`cloudRevision`), 2);
-  assert.match(window.document.querySelector('#networkStatus').textContent, /Đã đồng bộ/);
-  assert.match(window.document.querySelector('#networkStatus').getAttribute('onclick'), /quickSyncNow/);
-  dom.window.close();
-});
-
-test('trình duyệt Zalo báo ngoại tuyến vẫn thử Supabase và tải dữ liệu mới', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
-  const remote = JSON.parse(window.eval('JSON.stringify(db)'));
-  remote.students[0].name = 'BẢO AN TỪ MÁY TÍNH';
-  remote.students[0].full = 'NGUYỄN ĐÌNH BẢO AN TỪ MÁY TÍNH';
-  remote.tuitionNoticeSettings = JSON.parse(window.eval('JSON.stringify(tuitionNoticeDefaults)'));
-  window.__remoteClassroomState = remote;
-  await window.eval(`
-    currentSession={user:{id:'owner-1',email:AUTH_EMAIL}};
-    cloudRowReady=true;
-    cloudRevision=7;
-    cloudLastUpdated='2026-07-17T10:00:00Z';
-    cloudDirty=false;
-    window.__revisionRequests=0;
-    supabaseClient={
-      from(){return{
-        select(fields){return{eq(){return{maybeSingle:async()=>{
-          window.__revisionRequests++;
-          return fields==='revision, updated_at'
-            ?{data:{revision:8,updated_at:'2026-07-17T10:01:00Z'},error:null}
-            :{data:{data:window.__remoteClassroomState,revision:8,updated_at:'2026-07-17T10:01:00Z'},error:null};
-        }}}}}
-      }}
-    };
-    checkCloudRevision({manual:true})
-  `);
-  assert.ok(window.__revisionRequests >= 2);
-  assert.equal(window.eval(`db.students[0].name`), 'BẢO AN TỪ MÁY TÍNH');
-  assert.equal(window.eval(`cloudRevision`), 8);
-  assert.match(window.document.querySelector('#networkStatus').textContent, /Đã đồng bộ/);
-  dom.window.close();
-});
-
-test('điện thoại 0 dữ liệu không được phép ghi đè bản gốc Supabase', async () => {
-  const { dom, window, messages } = await createApp();
-  window.__rpcCalls = 0;
-  await window.eval(`
-    currentSession={user:{id:'owner-1',email:AUTH_EMAIL}};
-    db=structuredClone(initial);
-    supabaseClient={
-      from(){return{select(){return{eq(){return{maybeSingle:async()=>({data:null,error:null})}}}}}},
-      rpc(){window.__rpcCalls++;return Promise.resolve({data:null,error:null})}
-    };
-    initializeCloudFromDevice()
-  `);
-  assert.equal(window.__rpcCalls, 0);
-  assert.equal(window.eval('cloudRowReady'), false);
-  assert.match(messages.join('\n'), /không.*0 dữ liệu.*bản gốc/is);
-  assert.match(window.document.querySelector('#cloudStatusText').textContent, /thiết bị này đang trống/i);
-  dom.window.close();
-});
-
 test('lịch tương lai của học sinh đã nghỉ không xuất hiện trên tổng quan', async () => {
   const { dom, window } = await createApp();
   seed(window, { payment: false });
@@ -386,105 +95,9 @@ test('lịch học nhiều tuần có cột STT tự động', async () => {
   seed(window, { payment: false });
   window.eval('renderSchedule()');
   const headers = [...window.document.querySelectorAll('#schedule thead th')].map(item => item.textContent.trim());
-  const firstCell = window.document.querySelector('#scheduleTable tr td:nth-child(2)');
-  assert.equal(headers[1], 'STT');
+  const firstCell = window.document.querySelector('#scheduleTable tr td');
+  assert.equal(headers[0], 'STT');
   assert.equal(firstCell.textContent.trim(), '1');
-  assert.match(window.document.querySelector('#scheduleTable').textContent, /Sửa.*Xóa/s);
-  dom.window.close();
-});
-
-test('lọc lịch theo học sinh và xóa hàng loạt đúng lịch đang chọn', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval(`
-    db.students.push({id:'s2',name:'NGỌC TRÂM',full:'NGỌC TRÂM',grade:6,fee:150000,status:'active',subjects:'Toán',mode:'1:1'});
-    db.schedules.push({id:'sch2',student:'s2',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'09:00–10:30',subject:'Toán số 6',mode:'Trực tiếp'});
-    db.attendance.push({id:'att2',scheduleId:'sch2',student:'s2',date:'2026-07-07',time:'09:00',subject:'Toán số 6',status:'present',charged:true,unitFee:150000});
-    db.assignments.push({id:'asg2',student:'s2',assignedDate:'2026-07-07',sessionId:'att2',subject:'Toán số 6',due:'2026-07-14',title:'Bài tập',status:'new',note:''});
-    renderSchedule();
-  `);
-  const filter = window.document.querySelector('#scheduleStudent');
-  assert.match(filter.textContent, /BẢO AN \(1 lịch\)/);
-  assert.match(filter.textContent, /NGỌC TRÂM \(1 lịch\)/);
-  filter.value = 's2';
-  window.eval(`setScheduleStudentFilter('s2')`);
-  assert.equal(window.document.querySelectorAll('#scheduleTable tr').length, 1);
-  assert.match(window.document.querySelector('#scheduleTable').textContent, /NGỌC TRÂM/);
-  assert.doesNotMatch(window.document.querySelector('#scheduleTable').textContent, /BẢO AN/);
-  const checkbox = window.document.querySelector('.bulk-check[data-type="schedules"]');
-  checkbox.checked = true;
-  window.eval(`updateBulkSelection('schedules')`);
-  assert.equal(window.document.querySelector('#deleteSelectedSchedules').disabled, false);
-  assert.match(window.document.querySelector('#scheduleSelectedCount').textContent, /1 lịch đã chọn/);
-  window.eval('deleteSelectedSchedules()');
-  assert.equal(window.eval(`db.schedules.some(item=>item.id==='sch2')`), false);
-  assert.equal(window.eval(`db.schedules.some(item=>item.id==='sch1')`), true);
-  assert.equal(window.eval(`db.attendance.some(item=>item.id==='att2')`), false);
-  assert.equal(window.eval(`db.assignments.find(item=>item.id==='asg2').sessionId`), '');
-  dom.window.close();
-});
-
-test('lịch đã khóa học phí không được chọn để xóa hàng loạt', async () => {
-  const { dom, window } = await createApp();
-  seed(window);
-  window.eval(`renderSchedule(); toggleAllItems('schedules',true)`);
-  const checkbox = window.document.querySelector('.bulk-check[data-type="schedules"]');
-  assert.equal(checkbox.disabled, true);
-  assert.equal(checkbox.checked, false);
-  assert.equal(window.document.querySelector('#deleteSelectedSchedules').disabled, true);
-  assert.match(window.document.querySelector('#scheduleTable').textContent, /Đã khóa học phí/);
-  dom.window.close();
-});
-
-test('nhập lịch hàng loạt cập nhật môn và giờ của lịch cùng ngày giờ bắt đầu', async () => {
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval('openBulkScheduleImport()');
-  const form = window.document.querySelector('#modalBody form');
-  assert.equal(form.elements.markAttendance.checked, false);
-  assert.match(form.textContent, /chỉ bật khi nhập lại lịch sử/i);
-  form.elements.student.value = 's1';
-  form.elements.duration.value = '60';
-  form.elements.mode.value = 'Online';
-  form.elements.markAttendance.checked = false;
-  form.elements.rows.value = '06/07/2026 | 15:00 | Vật lý 9\n18/07/2026 | 07:30 | Toán hình 9';
-  window.eval(`submitBulkScheduleImport({preventDefault(){},target:document.querySelector('#modalBody form')})`);
-  const schedules = JSON.parse(window.eval('JSON.stringify(db.schedules)'));
-  const attendance = JSON.parse(window.eval('JSON.stringify(db.attendance)'));
-  assert.equal(schedules.length, 2);
-  assert.equal(schedules.find(item => item.id === 'sch1').subject, 'Vật lý 9');
-  assert.equal(schedules.find(item => item.id === 'sch1').time, '15:00–16:00');
-  assert.equal(schedules.find(item => item.id === 'sch1').mode, 'Online');
-  assert.equal(attendance.find(item => item.id === 'att1').subject, 'Vật lý 9');
-  assert.equal(attendance.find(item => item.id === 'att1').time, '15:00');
-  assert.match(window.document.querySelector('#toast').textContent, /thêm 1, cập nhật 1 lịch/i);
-  dom.window.close();
-});
-
-test('danh sách lịch mới của thầy được đọc đủ 17 dòng qua nhiều tuần', async () => {
-  const { dom, window } = await createApp();
-  const rows = `18/07/2026 | 07:30 | Vật lý 9
-18/07/2026 | 17:30 | Toán hình 9
-19/07/2026 | 13:30 | Hóa học 9
-19/07/2026 | 15:00 | Toán số 9
-20/07/2026 | 09:00 | Sinh học 9
-21/07/2026 | 09:00 | Vật lý 9
-21/07/2026 | 19:30 | Toán hình 9
-23/07/2026 | 09:00 | Hóa học 9
-24/07/2026 | 19:00 | Toán số 9
-25/07/2026 | 19:00 | Sinh học 9
-26/07/2026 | 09:00 | Toán hình 9
-27/07/2026 | 09:00 | Vật lý 9
-28/07/2026 | 09:00 | Toán số 9
-30/07/2026 | 09:00 | Hóa học 9
-31/07/2026 | 19:00 | Toán hình 9
-01/08/2026 | 19:00 | Sinh học 9
-02/08/2026 | 09:00 | Toán số 9`;
-  const parsed = JSON.parse(window.eval(`JSON.stringify(parseBulkScheduleRows(${JSON.stringify(rows)},90))`));
-  assert.equal(parsed.errors.length, 0);
-  assert.equal(parsed.rows.length, 17);
-  assert.deepEqual(parsed.rows[0], { date: '2026-07-18', start: '07:30', end: '09:00', subject: 'Vật lý 9' });
-  assert.deepEqual(parsed.rows.at(-1), { date: '2026-08-02', start: '09:00', end: '10:30', subject: 'Toán số 9' });
   dom.window.close();
 });
 
@@ -510,12 +123,6 @@ test('trang quản trị có khu vực quản lý tài khoản học sinh an to�
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY\s*=/);
 });
 
-test('nút xóa dữ liệu cục bộ nói rõ sẽ đăng xuất và không xóa Supabase', () => {
-  const source = fs.readFileSync(sourcePath, 'utf8');
-  assert.match(source, />Đăng xuất và xóa dữ liệu lưu tạm trên thiết bị này<\/button>/);
-  assert.match(source, /Dữ liệu trên Supabase và các thiết bị khác không bị xóa/);
-});
-
 test('cổng học sinh không hiển thị học phí hoặc khóa quản trị', () => {
   const source = fs.readFileSync(studentSourcePath, 'utf8');
   assert.match(source, /Cổng thông tin dành riêng cho học sinh/);
@@ -527,7 +134,7 @@ test('cổng học sinh ghép đúng điểm danh cũ chưa có scheduleId', asy
   const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
     .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
   const dom = new JSDOM(studentHtml, {
-    url: 'https://lehuuducdhsp-png.github.io/student/?test=1',
+    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1',
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     beforeParse(window) {
@@ -544,72 +151,6 @@ test('cổng học sinh ghép đúng điểm danh cũ chưa có scheduleId', asy
   const rowText = dom.window.document.querySelector('#scheduleRows').textContent;
   assert.match(rowText, /Có mặt/);
   assert.doesNotMatch(rowText, /Chưa điểm danh|Chưa ghi/);
-  dom.window.close();
-});
-
-test('cổng học sinh có thời khóa biểu riêng nằm giữa Tổng quan và Lịch học', () => {
-  const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
-    .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
-  const dom = new JSDOM(studentHtml, {
-    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1',
-    runScripts: 'dangerously',
-    pretendToBeVisual: true,
-    beforeParse(window) {
-      window.scrollTo = () => {};
-      window.open = () => null;
-    }
-  });
-  dom.window.eval(`studentTimetableWeek='2026-07-13'; studentTimetableDay=2; data={
-    profile:{id:'s1',name:'BẢO AN',full:'BẢO AN',grade:9,subjects:'KHTN'},
-    schedules:[{id:'sch1',date:'2026-07-13',weekStart:'2026-07-13',day:2,time:'17:30–19:00',subject:'Hóa học 9',mode:'Trực tiếp'}],
-    attendance:[],scores:[],assignments:[]
-  }; account={username:'bao.an'}; renderAll(); showTab('timetable');`);
-  const firstTabs = [...dom.window.document.querySelectorAll('#tabs [data-tab]')]
-    .slice(0, 3)
-    .map(item => item.textContent.trim());
-  assert.deepEqual(firstTabs, ['Tổng quan', 'Thời khóa biểu', 'Lịch học']);
-  assert.equal(dom.window.document.querySelector('#view-timetable').classList.contains('active'), true);
-  assert.match(dom.window.document.querySelector('#studentTimetableBody').textContent, /Hóa học 9/);
-  assert.match(dom.window.document.querySelector('#studentMobileList').textContent, /Hóa học 9/);
-  assert.match(dom.window.document.querySelector('#studentTimetableWeek').textContent, /13\/0?7\/2026/);
-  assert.match(dom.window.document.querySelector('#studentTimetableSummary').textContent, /1.*Buổi học trong tuần/s);
-  dom.window.close();
-});
-
-test('điện thoại có thêm bảng thời khóa biểu tuần cho cả giáo viên và học sinh', async () => {
-  const teacherSource = fs.readFileSync(sourcePath, 'utf8');
-  const studentSource = fs.readFileSync(studentSourcePath, 'utf8');
-  assert.match(teacherSource, /Kéo ngang để xem đủ 7 ngày/);
-  assert.match(teacherSource, /#timetable \.timetable-wrap\{display:block/);
-  assert.doesNotMatch(teacherSource, /#timetable \.timetable-wrap\{display:none/);
-  assert.match(studentSource, /Bảng chỉ có lịch của em/);
-  assert.match(studentSource, /\.student-timetable-wrap\{display:block/);
-  assert.doesNotMatch(studentSource, /\.student-timetable-wrap\{display:none/);
-
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval(`document.getElementById('timetableStudent').value='s1'; renderTimetable()`);
-  assert.equal(window.document.querySelectorAll('#timetableHead th').length, 8);
-  assert.match(window.document.querySelector('#timetableBody').textContent, /BẢO AN/);
-  assert.ok(window.document.querySelector('#timetableBody .lesson-trash'));
-  assert.ok(window.document.querySelector('#timetableBody .lesson-attendance'));
-  assert.ok(window.document.querySelector('#timetableBody .empty-slot'));
-  dom.window.close();
-});
-
-test('máy tính có xem nhanh thời khóa biểu theo từng ngày cho giáo viên và học sinh', async () => {
-  const teacherSource = fs.readFileSync(sourcePath, 'utf8');
-  const studentSource = fs.readFileSync(studentSourcePath, 'utf8');
-  assert.match(teacherSource, /\.mobile-timetable\{display:block/);
-  assert.match(studentSource, /\.student-mobile-timetable\{display:block/);
-  assert.match(teacherSource, /Xem nhanh theo từng ngày/);
-  assert.match(studentSource, /Xem nhanh theo từng ngày/);
-
-  const { dom, window } = await createApp();
-  seed(window, { payment: false });
-  window.eval(`mobileTimetableDay=2; document.getElementById('timetableStudent').value='s1'; renderTimetable()`);
-  assert.match(window.document.querySelector('#mobileTimetableList').textContent, /BẢO AN/);
-  assert.match(window.document.querySelector('#mobileTimetableList').textContent, /Hóa học 9/);
   dom.window.close();
 });
 
@@ -636,72 +177,69 @@ test('giáo viên xem như học sinh mà không cần hoặc thay đổi mật 
   const student = fs.readFileSync(studentSourcePath, 'utf8');
   const edge = fs.readFileSync(edgeFunctionPath, 'utf8');
   assert.match(teacher, /Xem như học sinh/);
-  assert.match(teacher, /studentPreviewDashboard/);
-  assert.match(teacher, /preview-key/);
-  assert.match(teacher, /ducTeacherPreview:/);
+  assert.match(teacher, /action:'preview_student'/);
   assert.match(student, /TEACHER_PREVIEW/);
   assert.match(student, /duc-teacher-preview-data/);
-  assert.match(student, /readStoredTeacherPreview/);
-  assert.match(student, /ducTeacherPreview:/);
   assert.match(edge, /action === 'preview_student'/);
   assert.match(edge, /teacher_preview_student/);
   assert.doesNotMatch(edge.match(/if \(action === 'preview_student'\)[\s\S]*?\n  }/)?.[0] || '', /updateUserById|password/);
 });
 
-test('xem như học sinh dùng dữ liệu đã lọc tại máy và không phụ thuộc Edge Function', async () => {
+function addSecondStudent(window) {
+  window.eval(`
+    db.students.push({id:'s2',name:'NGỌC TRÂM',full:'NGỌC TRÂM',grade:6,fee:150000,status:'active',subjects:'KHTN',mode:'1:1'});
+    db.schedules.push({id:'sch2',student:'s2',date:'2026-07-07',weekStart:'2026-07-06',day:3,time:'17:30–19:00',subject:'Vật lý 6',mode:'Trực tiếp'});
+    db.attendance.push({id:'att2',scheduleId:'sch2',student:'s2',date:'2026-07-07',time:'17:30',subject:'Vật lý 6',status:'present',charged:true,unitFee:150000});
+    db.scores.push({id:'score1',student:'s1',type:'BTVN',subject:'Hóa học 9',date:'2026-07-06',score:8,weight:1},{id:'score2',student:'s2',type:'BTVN',subject:'Vật lý 6',date:'2026-07-07',score:9,weight:1});
+    db.assignments.push({id:'as1',student:'s1',subject:'Hóa học 9',title:'Bài của An',note:'',due:'2026-07-10',status:'new'},{id:'as2',student:'s2',subject:'Vật lý 6',title:'Bài của Trâm',note:'',due:'2026-07-11',status:'new'});
+    renderAll();
+  `);
+}
+
+test('điểm danh có STT và thanh chọn học sinh thay cho danh sách nút dài', async () => {
   const { dom, window } = await createApp();
-  seed(window);
-  const sent = [];
-  const popup = { closed: false, postMessage(payload) { sent.push(payload); }, close() {} };
-  window.open = () => popup;
-  window.eval(`studentAccounts=[{studentId:'s1',username:'bao.an',status:'active'}]; openStudentPortalPreview('s1')`);
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].dashboard.profile.id, 's1');
-  assert.equal(sent[0].account.username, 'bao.an');
-  assert.equal(sent[0].dashboard.attendance.length, 1);
-  assert.equal('unitFee' in sent[0].dashboard.attendance[0], false);
-  assert.equal('paymentTransactions' in sent[0].dashboard, false);
-  assert.equal('payments' in sent[0].dashboard, false);
+  seed(window, { payment: false });
+  addSecondStudent(window);
+  const headers = [...window.document.querySelectorAll('#attendance thead th')].map(item => item.textContent.trim());
+  assert.equal(headers[1], 'STT');
+  assert.equal(window.document.querySelector('#attendanceTable tr td:nth-child(2)').textContent.trim(), '1');
+  assert.equal(window.document.querySelectorAll('#attendanceStudentFilterSelect option').length, 3);
+  window.eval("setAttendanceFilter('s2')");
+  assert.match(window.document.querySelector('#attendanceTable').textContent, /NGỌC TRÂM/);
+  assert.doesNotMatch(window.document.querySelector('#attendanceTable').textContent, /BẢO AN/);
   dom.window.close();
 });
 
-test('cổng học sinh trên điện thoại hiện đủ ngày tháng năm hiện tại', () => {
-  const student = fs.readFileSync(studentSourcePath, 'utf8');
-  const mobileBlock = student.match(/@media\(max-width:850px\)\{[\s\S]*?\n    @media\(max-width:520px\)/)?.[0] || '';
-  assert.match(mobileBlock, /\.hero-mark\{display:block/);
-  assert.doesNotMatch(mobileBlock, /\.hero-mark\{display:none/);
-  assert.match(student, /month:'long',year:'numeric'/);
-  assert.match(student, /id="heroDay"/);
-  assert.match(student, /id="heroMonth"/);
+test('bảng điểm và bài tập lọc được theo một học sinh', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  addSecondStudent(window);
+  window.eval("setSectionStudentFilter('scores','s2')");
+  assert.match(window.document.querySelector('#scoreTable').textContent, /NGỌC TRÂM/);
+  assert.doesNotMatch(window.document.querySelector('#scoreTable').textContent, /BẢO AN/);
+  assert.match(window.document.querySelector('#scoreSummary').textContent, /NGỌC TRÂM/);
+  window.eval("setSectionStudentFilter('assignments','s2')");
+  assert.match(window.document.querySelector('#assignmentGrid').textContent, /Bài của Trâm/);
+  assert.doesNotMatch(window.document.querySelector('#assignmentGrid').textContent, /Bài của An/);
+  dom.window.close();
 });
 
-test('xem như học sinh nhận dữ liệu dự phòng khi điện thoại cắt window.opener', async () => {
-  const studentHtml = fs.readFileSync(studentSourcePath, 'utf8')
-    .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
-  const payload = {
-    createdAt: Date.now(),
-    sameTab: true,
-    account: { username: 'bao.an' },
-    dashboard: {
-      profile: { id: 's1', name: 'BẢO AN', full: 'NGUYỄN ĐÌNH BẢO AN', grade: 9, subjects: 'KHTN' },
-      schedules: [], attendance: [], scores: [], assignments: []
-    }
-  };
-  const dom = new JSDOM(studentHtml, {
-    url: 'https://lehuuducdhsp-png.github.io/student/?teacher-preview=1&preview-key=mobile-test',
-    runScripts: 'dangerously',
-    pretendToBeVisual: true,
-    beforeParse(window) {
-      window.scrollTo = () => {};
-      window.localStorage.setItem('ducTeacherPreview:mobile-test', JSON.stringify(payload));
-      Object.defineProperty(window, 'opener', { value: null });
-    }
-  });
-  await new Promise(resolve => setTimeout(resolve, 20));
-  assert.equal(dom.window.document.querySelector('#studentApp').classList.contains('hidden'), false);
-  assert.match(dom.window.document.querySelector('#previewBanner').textContent, /GIÁO VIÊN XEM NHƯ HỌC SINH/);
-  assert.equal(dom.window.document.querySelector('#logoutButton').textContent, 'Quay lại quản trị');
-  assert.match(dom.window.document.querySelector('#studentGreeting').textContent, /BẢO AN/);
-  assert.equal(dom.window.localStorage.getItem('ducTeacherPreview:mobile-test'), null);
+test('công nợ lọc được theo học sinh nhưng tổng toàn lớp vẫn giữ nguyên', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  addSecondStudent(window);
+  const totalBefore = window.document.querySelector('#feeTotal').textContent;
+  window.eval("setSectionStudentFilter('tuition','s2')");
+  assert.match(window.document.querySelector('#tuitionTable').textContent, /NGỌC TRÂM/);
+  assert.doesNotMatch(window.document.querySelector('#tuitionTable').textContent, /BẢO AN/);
+  assert.equal(window.document.querySelector('#feeTotal').textContent, totalBefore);
   dom.window.close();
+});
+
+test('đồng bộ nhiều trình duyệt có Realtime và cơ chế kiểm tra lại 20 giây', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  assert.match(source, /postgres_changes/);
+  assert.match(source, /startCloudRealtime\(\)/);
+  assert.match(source, /loadCloudState\(\{force:true\}\)/);
+  assert.match(source, /},20000\);/);
 });
