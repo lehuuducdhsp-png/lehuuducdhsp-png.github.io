@@ -4,6 +4,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const TEACHER_EMAIL = (Deno.env.get('TEACHER_EMAIL') || 'lehuuducdhsp@gmail.com').toLowerCase()
 const STUDENT_DOMAIN = 'student.lophocthayduc.invalid'
+const DOCUMENT_BUCKET = 'classroom-documents'
 const ALLOWED_ORIGINS = new Set([
   'https://lehuuducdhsp-png.github.io',
   'http://localhost:8000',
@@ -201,6 +202,12 @@ async function teacherAction(req: Request, user: any, body: Record<string, unkno
   return response(req, { error: 'Thao tác không hợp lệ.' }, 400)
 }
 
+function documentVisibleToStudent(doc: any, studentId: string, studentStatus: string) {
+  if (!doc || doc.trashedAt || doc.pendingDelete || !doc.path) return false
+  if (doc.audienceMode === 'all') return studentStatus === 'active'
+  return doc.audienceMode === 'selected' && Array.isArray(doc.studentIds) && doc.studentIds.includes(studentId)
+}
+
 function studentDashboard(state: any, studentId: string) {
   const profile = Array.isArray(state.students) ? state.students.find((item: any) => item?.id === studentId) : null
   if (!profile) return null
@@ -211,6 +218,7 @@ function studentDashboard(state: any, studentId: string) {
     attendance: (Array.isArray(state.attendance) ? state.attendance : []).filter((item: any) => item?.student === studentId).map((item: any) => fields(item, ['id', 'scheduleId', 'date', 'time', 'subject', 'status', 'lessonTopic', 'comprehension', 'attitude', 'lessonCompletion', 'reviewNote', 'reviewedAt'])),
     scores: (Array.isArray(state.scores) ? state.scores : []).filter((item: any) => item?.student === studentId).map((item: any) => fields(item, ['id', 'date', 'type', 'subject', 'score', 'weight'])),
     assignments: (Array.isArray(state.assignments) ? state.assignments : []).filter((item: any) => item?.student === studentId).map((item: any) => fields(item, ['id', 'sessionId', 'assignedDate', 'subject', 'due', 'title', 'status', 'note'])),
+    documents: (Array.isArray(state.documents) ? state.documents : []).filter((item: any) => documentVisibleToStudent(item, studentId, profile.status)).map((item: any) => fields(item, ['id', 'title', 'type', 'size', 'bytes', 'createdAt'])),
     generatedAt: new Date().toISOString(),
   }
 }
@@ -227,6 +235,20 @@ async function studentAction(req: Request, user: any, body: Record<string, unkno
     await admin.from('student_accounts').update({ must_change_password: false, password_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('auth_user_id', user.id)
     await audit(ownerId, studentId, 'student_changed_password', user.id)
     return response(req, { ok: true })
+  }
+
+  if (body.action === 'open_document') {
+    if (account.must_change_password) return response(req, { error: 'Em cần đổi mật khẩu tạm trước khi mở tài liệu.' }, 403)
+    const documentId = safeText(body.documentId, 160)
+    if (!documentId) return response(req, { error: 'Thiếu tài liệu.' }, 400)
+    const state = await classroom(ownerId)
+    const profile = Array.isArray(state.students) ? state.students.find((item: any) => item?.id === studentId) : null
+    const doc = (Array.isArray(state.documents) ? state.documents : []).find((item: any) => item?.id === documentId)
+    if (!profile || !documentVisibleToStudent(doc, studentId, profile.status)) return response(req, { error: 'Tài liệu không tồn tại hoặc chưa được cấp cho em.' }, 404)
+    const { data: signed, error: signedError } = await admin.storage.from(DOCUMENT_BUCKET).createSignedUrl(doc.path, 120)
+    if (signedError || !signed?.signedUrl) throw signedError || new Error('Không tạo được liên kết tài liệu.')
+    await audit(ownerId, studentId, 'student_open_document', user.id, { documentId })
+    return response(req, { signedUrl: signed.signedUrl, expiresIn: 120 })
   }
 
   if (body.action !== 'student_dashboard') return response(req, { error: 'Thao tác không hợp lệ.' }, 400)
