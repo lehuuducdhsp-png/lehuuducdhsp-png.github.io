@@ -201,7 +201,7 @@
     const SUPABASE_PUBLISHABLE_KEY='sb_publishable_u05uKoArlUZn_OMtS5aVgA__W3np9Hb';
     const AUTH_USERNAME='lehuuducdhsp';
     const AUTH_EMAIL='lehuuducdhsp@gmail.com';
-    const APP_VERSION='2026.07.18.9';
+    const APP_VERSION='2026.07.18.10';
     const DEVICE_ID=localStorage.getItem('ducDeviceId')||`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
     localStorage.setItem('ducDeviceId',DEVICE_ID);
     let supabaseClient=null,currentSession=null,cloudRowReady=localStorage.getItem('ducCloudReady')==='1',cloudSaveTimer=null,cloudDirty=localStorage.getItem('ducCloudPending')==='1',cloudSaving=false,cloudRefreshing=false,cloudLastUpdated='',cloudLoadedUser='',cloudRealtimeChannel=null,cloudRealtimeUser='';
@@ -210,7 +210,7 @@
     let studentAccounts=[],studentAccountsLoading=false,lastIssuedCredential=null,studentPreviewWindow=null,pendingStudentPreview=null;
     const IDLE_WARNING_MS=55*60*1000,IDLE_LOGOUT_MS=60*60*1000,IMPORT_MAX_BYTES=10*1024*1024;
     const isAuthorized=session=>session?.user?.email?.toLowerCase()===AUTH_EMAIL;
-    const isEmbeddedBrowser=()=>/FBAN|FBAV|Instagram|Messenger|Zalo|Line\/|ChatGPT|GSA\//i.test(navigator.userAgent||'');
+    const isEmbeddedBrowser=()=>{const ua=navigator.userAgent||'';return /FBAN|FBAV|Instagram|Messenger|Zalo|Line\/|ChatGPT|GSA\/|; wv\)|\bwv\b/i.test(ua)||/(iPhone|iPad|iPod).*AppleWebKit(?!.*Safari)/i.test(ua)};
     const authWithTimeout=(promise,ms=12000)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('AUTH_TIMEOUT')),ms))]);
     function showEmbeddedBrowserNotice(){document.getElementById('embeddedBrowserNotice')?.classList.toggle('show',isEmbeddedBrowser())}
     async function copyFreshAppLink(){const url=`${location.origin}${location.pathname}?v=${APP_VERSION}&fresh=${Date.now()}`;try{await navigator.clipboard.writeText(url);toast('Đã sao chép liên kết. Hãy dán vào Safari hoặc Chrome.')}catch{prompt('Sao chép liên kết này và mở bằng Safari/Chrome:',url)}}
@@ -648,6 +648,6 @@ function paymentExactSessionIds(payment){const ids=Array.isArray(payment?.period
     window.addEventListener('offline',updateNetworkStatus);
     window.setInterval(()=>{if(document.getElementById('classroomApp').style.display==='block'){setDates();renderDashboard();refreshCloudWhenActive();enforceIdleSession()}},20000);
   </script>
-  <script src="./tuition-poster.js?v=2026.07.18.9"></script>
+  <script src="./tuition-poster.js?v=2026.07.18.10"></script>
 </body>
 </html>
