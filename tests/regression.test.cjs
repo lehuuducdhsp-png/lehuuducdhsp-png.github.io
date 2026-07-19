@@ -5,9 +5,12 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
 const sourcePath = path.join(__dirname, '..', 'index.html');
+const tuitionPosterPath = path.join(__dirname, '..', 'tuition-poster.js');
+const serviceWorkerPath = path.join(__dirname, '..', 'sw.js');
 const studentSourcePath = path.join(__dirname, '..', 'student', 'index.html');
-const edgeFunctionPath = path.join(__dirname, '..', '..', 'supabase', 'functions', 'student-portal', 'index.ts');
-const studentSqlPath = path.join(__dirname, '..', '..', 'supabase', 'student_portal.sql');
+const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'student-portal', 'index.ts');
+const studentSqlPath = path.join(__dirname, '..', 'supabase', 'student_portal.sql');
+const studentFeaturesSqlPath = path.join(__dirname, '..', 'supabase', 'student_features.sql');
 const html = fs.readFileSync(sourcePath, 'utf8')
   .replace(/<script src="https:\/\/cdn\.jsdelivr\.net[\s\S]*?<\/script>/g, '');
 
@@ -259,4 +262,78 @@ test('lịch học lọc theo học sinh và xóa hàng loạt đúng các dòng
   assert.equal(window.eval("db.schedules.some(item=>item.id==='sch1')"), true);
   assert.equal(window.eval("db.attendance.some(item=>item.id==='att1')"), true);
   dom.window.close();
+});
+
+test('Cài đặt cho phép sửa thông tin, đổi ảnh giáo viên và đổi logo', async () => {
+  const { dom, window } = await createApp();
+  const form = window.document.querySelector('#brandingSettingsForm');
+  assert.ok(form);
+  assert.equal(form.elements.teacherName.readOnly, false);
+  assert.equal(form.elements.slogan.readOnly, false);
+  assert.ok(window.document.querySelector('#teacherAvatarFile'));
+  assert.ok(window.document.querySelector('#brandLogoFile'));
+  form.elements.brandName.value = 'LỚP HỌC MỚI';
+  form.elements.teacherName.value = 'LÊ HỮU ĐỨC';
+  form.elements.teacherTitle.value = 'Giáo viên KHTN';
+  form.elements.fanpage.value = 'Trang lớp học';
+  form.elements.slogan.value = 'Học chắc mỗi ngày';
+  form.elements.privacyText.value = 'Dữ liệu được bảo vệ';
+  await window.eval(`saveBrandingSettings({preventDefault(){},currentTarget:document.querySelector('#brandingSettingsForm')})`);
+  assert.equal(window.eval('db.settings.brandName'), 'LỚP HỌC MỚI');
+  assert.equal(window.document.querySelector('#sidebarBrandName').textContent, 'LỚP HỌC MỚI');
+  assert.equal(window.document.querySelector('#sidebarBrandSlogan').textContent, 'Học chắc mỗi ngày');
+  dom.window.close();
+});
+
+test('giao bài chọn được buổi học tiếp theo đúng môn và vẫn giữ lịch ngày', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`db.schedules.push(
+    {id:'sch-toan',student:'s1',date:'2026-07-08',weekStart:'2026-07-06',day:4,time:'09:00–10:30',subject:'Toán số 9',mode:'Trực tiếp'},
+    {id:'sch-next',student:'s1',date:'2026-07-13',weekStart:'2026-07-13',day:2,time:'15:00–16:30',subject:'Hóa học 9',mode:'Trực tiếp'}
+  ); openAssignmentModal('s1','att1')`);
+  const form = window.document.querySelector('#assignmentForm');
+  assert.equal(form.elements.due.type, 'date');
+  window.eval(`pickNextAssignmentLesson(document.querySelector('#assignmentForm'))`);
+  assert.equal(form.elements.due.value, '2026-07-13');
+  assert.equal(form.elements.dueScheduleId.value, 'sch-next');
+  form.elements.title.value = 'Bài tập Hóa học';
+  form.elements.note.value = 'Hoàn thành trước buổi sau';
+  window.eval(`submitAssignment({preventDefault(){},target:document.querySelector('#assignmentForm')},'')`);
+  assert.equal(window.eval('db.assignments[0].dueScheduleId'), 'sch-next');
+  window.eval(`db.schedules.find(item=>item.id==='sch-next').date='2026-07-14'; save()`);
+  assert.equal(window.eval('db.assignments[0].due'), '2026-07-14');
+  dom.window.close();
+});
+
+test('Bài tập sắp xếp được theo ngày giao và hạn hoàn thành', async () => {
+  const { dom, window } = await createApp();
+  seed(window, { payment: false });
+  window.eval(`db.assignments=[
+    {id:'a1',student:'s1',assignedDate:'2026-07-10',subject:'Hóa học 9',due:'2026-07-20',dueScheduleId:'',title:'Giao mới',status:'new',note:''},
+    {id:'a2',student:'s1',assignedDate:'2026-07-01',subject:'Hóa học 9',due:'2026-07-12',dueScheduleId:'',title:'Hạn gần',status:'new',note:''}
+  ]; renderAssignments()`);
+  assert.equal(window.document.querySelector('.assignment h3').textContent, 'Giao mới');
+  window.document.querySelector('#assignmentSort').value = 'due-asc';
+  window.eval('renderAssignments()');
+  assert.equal(window.document.querySelector('.assignment h3').textContent, 'Hạn gần');
+  dom.window.close();
+});
+
+test('hồ sơ, ảnh đại diện và bài nộp học sinh dùng kho riêng tư', () => {
+  const student = fs.readFileSync(studentSourcePath, 'utf8');
+  const edge = fs.readFileSync(edgeFunctionPath, 'utf8');
+  const sql = fs.readFileSync(studentFeaturesSqlPath, 'utf8');
+  assert.match(student, /id="studentProfileForm"/);
+  assert.match(student, /uploadStudentAvatar/);
+  assert.match(student, /save_assignment_submission/);
+  assert.match(student, /Nộp bài cho thầy/);
+  assert.match(edge, /createSignedUploadUrl/);
+  assert.match(edge, /Bài tập không thuộc tài khoản này/);
+  assert.match(edge, /studentId.*assignments/s);
+  assert.match(sql, /create table if not exists public\.student_profiles/i);
+  assert.match(sql, /create table if not exists public\.assignment_submissions/i);
+  assert.match(sql, /values \('student-work', 'student-work', false/i);
+  assert.match(sql, /student_work_teacher_select/);
+  assert.doesNotMatch(sql, /student_work_student_select/);
 });
