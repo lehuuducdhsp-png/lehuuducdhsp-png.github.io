@@ -127,3 +127,94 @@
   window.shareTuitionNotice=shareNotice;
   window.printTuitionNotice=printNotice;
 })();
+
+(()=>{
+  if(typeof window.renderStudents!=='function'||!document.getElementById('students'))return;
+
+  let statusFilter='all';
+  let sortMode='name-asc';
+  let inactiveExpanded=localStorage.getItem('ducStudentInactiveExpanded')==='true';
+
+  const style=document.createElement('style');
+  style.id='student-list-enhancement-style';
+  style.textContent=`
+    .student-overview{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:-2px 0 18px;padding:13px 15px;border:1px solid #cfe6e1;border-radius:16px;background:linear-gradient(90deg,#f0fdfa,#f8fbff)}
+    .student-summary{display:flex;align-items:center;gap:9px;color:#475569;font-size:12px;font-weight:700}.student-summary:before{content:'●';color:var(--teal);font-size:10px}.student-summary b{color:var(--navy2)}
+    .student-list-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.student-filter-pills{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:13px;background:#fff}.student-filter-btn{border:0;background:transparent;color:#64748b;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:850;white-space:nowrap}.student-filter-btn:hover{background:#f1f5f9;color:var(--ink)}.student-filter-btn.active{background:#e7f7f3;color:var(--teal);box-shadow:inset 0 0 0 1px #b9e4da}.student-filter-btn[data-student-filter="inactive"].active{background:#fff1f2;color:#be123c;box-shadow:inset 0 0 0 1px #fecdd3}.student-filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 5px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:10px}.student-filter-btn.active .student-filter-count{background:#fff;color:inherit}
+    .student-sort-control{display:flex;align-items:center;gap:7px;color:#64748b;font-size:11px;font-weight:800}.student-sort-control select{min-width:150px;border:1px solid var(--line);border-radius:11px;padding:8px 10px;background:#fff;color:var(--ink);font-weight:700;outline:none}.student-sort-control select:focus{border-color:#58b9a8;box-shadow:0 0 0 3px #dff6f0}
+    #studentGrid.student-groups{display:grid;grid-template-columns:1fr;gap:18px}.student-group{padding:16px;border:1px solid #dcebe7;border-radius:20px;background:rgba(255,255,255,.62)}.student-group.inactive-group{border-color:#e5e7eb;background:rgba(248,250,252,.78)}.student-group-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.student-group.collapsed .student-group-head{margin-bottom:0}.student-group-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.student-group-title strong{color:var(--navy2);font-size:14px}.student-group-dot{width:9px;height:9px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px #dff6f0}.inactive-group .student-group-dot{background:#ef4444;box-shadow:0 0 0 4px #fee2e2}.student-group-count{padding:3px 7px;border-radius:999px;background:#eaf7f4;color:var(--teal);font-size:10px;font-weight:850}.inactive-group .student-group-count{background:#fff1f2;color:#be123c}.student-group-caption{margin-top:3px;color:#94a3b8;font-size:10px}.student-group-toggle{border:1px solid var(--line);background:#fff;color:#64748b;border-radius:10px;padding:7px 10px;font-size:10px;font-weight:850;white-space:nowrap}.student-group-toggle:hover{border-color:#cbd5e1;background:#f8fafc;color:var(--ink)}.student-group.collapsed>.student-grid{display:none}.student-group>.student-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .student-card.inactive{border-color:#e5e7eb;background:linear-gradient(145deg,#fff,#fbfcfd);box-shadow:0 10px 28px rgba(15,45,70,.055)}.student-card.inactive:hover{border-color:#d1d5db;box-shadow:0 13px 30px rgba(15,45,70,.075)}.student-card.inactive .student-meta{background:#fafafa}.student-card.inactive .student-footer>b{color:#64748b}.student-card.inactive:before{width:3px;background:#ef4444}
+    @media(max-width:1180px){.student-group>.student-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:860px){.student-overview{align-items:stretch}.student-list-tools{width:100%;justify-content:space-between}.student-group>.student-grid{grid-template-columns:1fr}}
+    @media(max-width:560px){.student-list-tools,.student-filter-pills,.student-sort-control,.student-sort-control select{width:100%}.student-filter-pills{display:grid;grid-template-columns:repeat(3,1fr)}.student-filter-btn{padding:8px 5px}.student-sort-control{justify-content:space-between}.student-sort-control select{flex:1;min-width:0}.student-group{padding:12px}.student-group-head{align-items:flex-start}.student-group-toggle{padding:6px 8px}.student-card .student-footer{align-items:flex-start;flex-direction:column}.student-card .student-footer .actions{width:100%}}
+  `;
+  document.head.appendChild(style);
+
+  const page=document.getElementById('students');
+  const pageHead=page.querySelector('.page-head');
+  const host=document.getElementById('studentGrid');
+  if(!pageHead||!host)return;
+  host.classList.remove('student-grid');
+  host.classList.add('student-groups');
+
+  const overview=document.createElement('div');
+  overview.className='student-overview';
+  overview.innerHTML=`<div class="student-summary" id="studentSummaryText"></div><div class="student-list-tools"><div class="student-filter-pills" role="group" aria-label="Lọc học sinh theo trạng thái"><button type="button" class="student-filter-btn active" data-student-filter="all">Tất cả <span class="student-filter-count" data-student-count="all">0</span></button><button type="button" class="student-filter-btn" data-student-filter="active">Đang học <span class="student-filter-count" data-student-count="active">0</span></button><button type="button" class="student-filter-btn" data-student-filter="inactive">Đã nghỉ <span class="student-filter-count" data-student-count="inactive">0</span></button></div><label class="student-sort-control">Sắp xếp<select id="studentSortEnhanced"><option value="name-asc">Tên A → Z</option><option value="name-desc">Tên Z → A</option><option value="grade-asc">Lớp thấp → cao</option><option value="grade-desc">Lớp cao → thấp</option></select></label></div>`;
+  pageHead.insertAdjacentElement('afterend',overview);
+
+  overview.addEventListener('click',event=>{
+    const button=event.target.closest('[data-student-filter]');
+    if(!button)return;
+    statusFilter=button.dataset.studentFilter||'all';
+    if(statusFilter==='inactive')inactiveExpanded=true;
+    renderStudentsEnhanced();
+  });
+  overview.querySelector('#studentSortEnhanced').addEventListener('change',event=>{sortMode=event.target.value||'name-asc';renderStudentsEnhanced()});
+  host.addEventListener('click',event=>{
+    const button=event.target.closest('[data-student-toggle-inactive]');
+    if(!button)return;
+    event.stopPropagation();
+    inactiveExpanded=!inactiveExpanded;
+    localStorage.setItem('ducStudentInactiveExpanded',String(inactiveExpanded));
+    renderStudentsEnhanced();
+  });
+
+  const normalizeSearch=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toLocaleLowerCase('vi').trim();
+  const displayName=item=>studentExtendedProfile(item.id).fullName||item.full||item.name||'';
+  const shortName=item=>item.name||displayName(item);
+  const gradeNumber=item=>{const profile=studentExtendedProfile(item.id),match=String(profile.gradeText||item.grade||'').match(/\d+/);return match?Number(match[0]):999};
+  const compareName=(left,right)=>String(shortName(left)).localeCompare(String(shortName(right)),'vi',{sensitivity:'base'})||String(displayName(left)).localeCompare(String(displayName(right)),'vi',{sensitivity:'base'});
+  const compareStudents=(left,right)=>{
+    if(sortMode==='name-desc')return-compareName(left,right);
+    if(sortMode==='grade-asc')return gradeNumber(left)-gradeNumber(right)||compareName(left,right);
+    if(sortMode==='grade-desc')return gradeNumber(right)-gradeNumber(left)||compareName(left,right);
+    return compareName(left,right);
+  };
+
+  function studentCardHtml(item,feeMap){
+    const profile=studentExtendedProfile(item.id),active=item.status!=='inactive',initials=String(item.name||profile.fullName).split(' ').filter(Boolean).map(part=>part[0]).slice(-2).join(''),avatar=profile.avatarUrl?`<div class="student-avatar has-photo"><img src="${esc(profile.avatarUrl)}" alt="Ảnh ${esc(item.name)}"></div>`:`<div class="student-avatar">${esc(initials)}</div>`,sessions=feeMap.get(item.id)?.sessions||0;
+    return `<article class="student-card ${active?'':'inactive'}" role="button" tabindex="0" onclick="openStudentDetail('${item.id}')" onkeydown="if(event.key==='Enter')openStudentDetail('${item.id}')"><div class="student-top">${avatar}<div><h3>${esc(profile.fullName)}</h3><span class="badge ${active?'green':'red'}"><i class="dot"></i>${active?'Đang học':'Đã nghỉ'}</span></div></div><div class="student-meta"><div><small>Lớp</small><b>${esc(profile.gradeText||item.grade)}</b></div><div><small>Trường</small><b>${esc(profile.school||'Chưa điền')}</b></div><div><small>Môn học</small><b>${esc(item.subjects)}</b></div><div><small>Đơn giá</small><b>${money(item.fee)}/buổi</b></div></div><div class="student-footer"><b>${sessions} buổi tính phí</b><div class="actions"><button class="btn soft small" onclick="event.stopPropagation();openStudentDetail('${item.id}')">Hồ sơ & lịch học</button><button class="btn outline small" onclick="event.stopPropagation();editStudent('${item.id}')">Sửa</button><button class="btn danger small" onclick="event.stopPropagation();deleteStudent('${item.id}')">Xóa</button></div></div></article>`;
+  }
+
+  function groupHtml(kind,items,feeMap,forceExpanded=false){
+    if(!items.length)return'';
+    const inactive=kind==='inactive',collapsed=inactive&&!forceExpanded&&!inactiveExpanded,label=inactive?'Đã nghỉ':'Đang học',caption=inactive?'Hồ sơ học sinh cũ được tách riêng để danh sách chính gọn hơn.':'Học sinh hiện đang theo học và cần ưu tiên quản lý hằng ngày.',toggle=inactive?`<button type="button" class="student-group-toggle" data-student-toggle-inactive aria-expanded="${collapsed?'false':'true'}">${collapsed?'Hiện danh sách ↓':'Thu gọn ↑'}</button>`:'';
+    return `<section class="student-group ${inactive?'inactive-group':''} ${collapsed?'collapsed':''}"><div class="student-group-head"><div><div class="student-group-title"><span class="student-group-dot"></span><strong>${label}</strong><span class="student-group-count">${items.length} học sinh</span></div><div class="student-group-caption">${caption}</div></div>${toggle}</div><div class="student-grid">${items.map(item=>studentCardHtml(item,feeMap)).join('')}</div></section>`;
+  }
+
+  function renderStudentsEnhanced(){
+    const query=normalizeSearch(document.getElementById('studentSearch')?.value),all=[...(db.students||[])],activeTotal=all.filter(item=>item.status!=='inactive').length,inactiveTotal=all.length-activeTotal,feeMap=new Map(feeRows().map(row=>[row.id,row]));
+    overview.querySelectorAll('[data-student-count]').forEach(node=>{const key=node.dataset.studentCount;node.textContent=key==='active'?activeTotal:key==='inactive'?inactiveTotal:all.length});
+    overview.querySelectorAll('[data-student-filter]').forEach(button=>{const selected=button.dataset.studentFilter===statusFilter;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected))});
+    const matching=all.filter(item=>{const profile=studentExtendedProfile(item.id),haystack=normalizeSearch([item.full,item.name,item.subjects,profile.fullName,profile.school,profile.gradeText].join(' '));return!query||haystack.includes(query)}),visible=matching.filter(item=>statusFilter==='all'||(statusFilter==='active'?item.status!=='inactive':item.status==='inactive')),active=visible.filter(item=>item.status!=='inactive').sort(compareStudents),inactive=visible.filter(item=>item.status==='inactive').sort(compareStudents),summary=document.getElementById('studentSummaryText');
+    if(summary){const narrowed=query||statusFilter!=='all';summary.innerHTML=narrowed?`Đang hiển thị <b>${visible.length}/${all.length}</b> học sinh • ${active.length} đang học • ${inactive.length} đã nghỉ`:`<b>${activeTotal}</b> đang học • <b>${inactiveTotal}</b> đã nghỉ • <b>${all.length}</b> tổng cộng`}
+    if(!visible.length){host.innerHTML='<div class="empty">Không tìm thấy học sinh phù hợp.</div>';fillStudentSelects();return}
+    if(statusFilter==='active')host.innerHTML=groupHtml('active',active,feeMap,true);
+    else if(statusFilter==='inactive')host.innerHTML=groupHtml('inactive',inactive,feeMap,true);
+    else host.innerHTML=groupHtml('active',active,feeMap,true)+groupHtml('inactive',inactive,feeMap,Boolean(query));
+    fillStudentSelects();
+  }
+
+  window.renderStudents=renderStudentsEnhanced;
+  renderStudentsEnhanced();
+})();
